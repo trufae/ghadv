@@ -19,6 +19,7 @@ Keys:
 | Key | Action |
 | --- | --- |
 | `j` / `k` | move one row |
+| mouse wheel down / up | move one row, like `j` / `k` |
 | `J` / `K` | move ten rows |
 | `tab` | switch view, and jump to the linked commit/advisory |
 | `enter` | show the commit (`git show`) or the advisory (`r2` Markdown rendering if available, otherwise `$PAGER`) |
@@ -55,6 +56,10 @@ The state filter applies only to the advisory list; commit links still use all a
 Jumping from a commit to a linked advisory outside the current filter switches back to all.
 
 After viewing an advisory with `r2`, press `enter` to return to the list.
+
+Mouse reporting is enabled while the TUI is active, so the wheel moves the selection
+instead of the terminal scrollback. It is disabled when opening a viewer, editor or
+prompt in cooked mode, and when quitting.
 
 The header shows the repository, active view and advisory filter. Pressing `A`
 cycles through `claude -p`, `codex exec -` and `pmai "$(cat)"`; a custom `GHAV_AI` is

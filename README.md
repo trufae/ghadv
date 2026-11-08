@@ -64,7 +64,8 @@ ghav [-r owner/repo] [command] [args]
 Run `ghav` with no arguments for the TUI: advisories and fix commits side by side, `tab` to
 switch, `m` for the selected advisory's actions, `c` to request a CVE, `s` for status,
 and `f` to filter by state. Two rows of colored shortcuts show navigation and the actions
-available for the selection; `?` shows all keys.
+available for the selection; `?` shows all keys. Use `j`/`k` or the mouse wheel to
+move down/up one row in the active list.
 
 CVE assignment is separate from publication. For an already published advisory:
 

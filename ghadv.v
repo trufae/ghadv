@@ -28,7 +28,7 @@ Environment:
 const agents = ['claude -p', 'codex exec -', 'pmai "\$(cat)"']
 const states = ['all', 'triage', 'draft', 'published', 'closed']
 
-const tui_help = 'tab: switch advisories/commits; j/k: move; J/K: move ten rows
+const tui_help = 'tab: switch advisories/commits; j/k or mouse wheel: move; J/K: move ten rows
 enter: view advisory/commit; e: edit; r: AI review; n: new draft from commit
 c (or a): request CVE; d: accept/reopen as draft; p: publish; x: close
 s: advisory status; m: actions menu; f: cycle advisory state filter
@@ -508,11 +508,50 @@ fn act(k string, repo string, id string) !string {
 	return 'advisory updated; press s for status'
 }
 
-// polls stdin (stty time 2); returns '' when the terminal is resized
+// polls one key or wheel event (stty time 2); returns '' when the terminal is resized
 fn key(resize bool) string {
 	w, h := term.get_terminal_size()
 	for {
-		s, _ := os.fd_read(0, 8)
+		mut s, _ := os.fd_read(0, 1)
+		if s == '\x1b' {
+			// Read one complete escape sequence, leaving queued events for the next call.
+			for s.len < 64 {
+				c, _ := os.fd_read(0, 1)
+				if c == '' {
+					break
+				}
+				s += c
+				if s in ['\x1b[', '\x1bO'] {
+					continue
+				}
+				if s.starts_with('\x1b[M') {
+					// Legacy mouse reports have three bytes after CSI M.
+					if s.len < 6 {
+						continue
+					}
+				} else if s.starts_with('\x1b[') && (c[0] < 0x40 || c[0] > 0x7e) {
+					continue
+				}
+				break
+			}
+		}
+		if s.starts_with('\x1b[<') || s.starts_with('\x1b[M') {
+			mut button := -1
+			if s.starts_with('\x1b[M') && s.len == 6 {
+				button = int(s[3]) - 32
+			} else if s.starts_with('\x1b[<') && s.ends_with('M') {
+				fields := s[3..s.len - 1].split(';')
+				if fields.len == 3 {
+					button = fields[0].int()
+				}
+			}
+			// Ignore clicks, releases and horizontal scrolling; strip Shift/Alt/Ctrl.
+			match button & ~28 {
+				64 { return 'k' }
+				65 { return 'j' }
+				else { continue }
+			}
+		}
 		if s != '' {
 			return s
 		}
@@ -528,9 +567,10 @@ fn tui(repo string) {
 	saved := os.exec(['stty', '-g']).output.trim_space()
 	raw := fn () {
 		os.system_args(['stty', '-icanon', '-echo', 'min', '0', 'time', '2'])
-		print('\x1b[?25l')
+		print('\x1b[?25l\x1b[?1000h\x1b[?1006h')
 	}
 	cooked := fn [saved] () {
+		print('\x1b[?1000l\x1b[?1006l')
 		os.system_args(['stty', saved])
 		print('\x1b[?25h\x1b[H\x1b[2J')
 	}
