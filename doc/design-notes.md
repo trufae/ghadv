@@ -12,8 +12,9 @@ Short version of the reasoning behind the tool.
   agent is told this explicitly.
 - **One commit is not one CVE.** A patch may fix several independent bugs, or several commits
   one root cause. The agent reports the most important one and lists the rest in its notes.
-- **Keep publication behind an approval.** Drafts and analysis are automated; `publish` and
-  `approve` are explicit, confirmed actions.
+- **Keep publication behind an approval.** `publish`, `close` and `draft` ask for
+  confirmation, as do all lifecycle/CVE actions in the TUI. The explicit CLI `cve`
+  command (also named `approve` for compatibility) submits a request directly.
 - **Text in, JSON out.** The advisory is a plain-text format that is easy to edit in `$EDITOR`
   and diff for review; JSON conversion stays deterministic in the tool.
 

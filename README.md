@@ -20,7 +20,8 @@ $ ghav new 8f3a2c1 found by fuzzing the PDB parser
 - **Drafts** an advisory from a single commit: the agent reads the patch, the history and the
   tags, and writes root cause, CWE, CVSS and the affected/patched versions.
 - **Reviews** existing advisories with the agent as a diff you accept or reject line by line.
-- **Assigns CVEs, publishes and closes** — always behind an explicit confirmation.
+- **Requests CVEs**, including for published advisories, accepts private reports as drafts,
+  publishes and closes. TUI actions ask for confirmation.
 - **Stays out of the way**: advisories are plain text in `$EDITOR`, no JSON, no web forms.
 
 The API is easy; reconstructing the vulnerability is hard. `ghav` puts the hard part in front
@@ -46,19 +47,34 @@ Or build only: `make` (same as `v -o ghav ghadv.v`). `PREFIX` and `BINDIR` are o
 ghav [-r owner/repo] [command] [args]
 
   tui                     interactive list (default)
-  ls                      list advisories
+  ls [state]              list all/triage/draft/published/closed advisories
   log                     list fix commits and their advisories
   new <commit> [context]  analyze a commit with AI and create a draft
   show <ghsa>             print an advisory
+  status <ghsa>           show lifecycle, CVE and private report details
   edit <ghsa>             edit an advisory in $EDITOR
   review <ghsa> [context] AI-review and rewrite it, then edit
-  approve <ghsa>          request a CVE id
+  cve <ghsa>              request a CVE id (asynchronous)
+  approve <ghsa>          alias for cve
+  draft <ghsa>            accept a report or reopen as a draft
   publish <ghsa>          publish
   close <ghsa>            close (reject)
 ```
 
 Run `ghav` with no arguments for the TUI: advisories and fix commits side by side, `tab` to
-switch, `n` to draft, `r` to review, `p` to publish.
+switch, `m` for the selected advisory's actions, `c` to request a CVE, `s` for status,
+and `f` to filter by state. Two rows of colored shortcuts show navigation and the actions
+available for the selection; `?` shows all keys.
+
+CVE assignment is separate from publication. For an already published advisory:
+
+```sh
+ghav -r owner/repo cve GHSA-xxxx-yyyy-zzzz
+ghav -r owner/repo status GHSA-xxxx-yyyy-zzzz
+```
+
+In the TUI, `requested*` records a CVE request accepted during this session. Reload with
+`g` to check for the assigned ID; GitHub REST does not expose a pending-request status.
 
 Press `enter` on an advisory to render its Markdown with `r2 -q -c "cat -m file.md" --`
 when `r2` is on `PATH`, then press `enter` to return. Otherwise it opens in `$PAGER`
