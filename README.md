@@ -60,6 +60,10 @@ ghav [-r owner/repo] [command] [args]
 Run `ghav` with no arguments for the TUI: advisories and fix commits side by side, `tab` to
 switch, `n` to draft, `r` to review, `p` to publish.
 
+Press `enter` on an advisory to render its Markdown with `r2 -q -c "cat -m file.md" --`
+when `r2` is on `PATH`, then press `enter` to return. Otherwise it opens in `$PAGER`
+(default: `less`).
+
 Agents: `claude -p` (default), `codex exec -`, `pmai` — anything that reads a prompt on
 stdin.
 

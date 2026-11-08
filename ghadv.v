@@ -393,7 +393,13 @@ fn run(k string, repo string, id string, sha string) ! {
 			}
 			path := os.join_path(os.temp_dir(), 'ghav-${id}.md')
 			os.write_file(path, fetch(repo, id)!)!
-			sh('${os.getenv_opt('PAGER') or { 'less' }} "\$1"', path)
+			if os.exists_in_system_path('r2') {
+				// The leading quote bypasses r2 command parsing for the filename.
+				os.system_args(['r2', '-q', '-c', "'cat -m ${path}", '--'])
+				os.input('press enter')
+			} else {
+				sh('${os.getenv_opt('PAGER') or { 'less' }} "\$1"', path)
+			}
 			os.rm(path)!
 		}
 	}
