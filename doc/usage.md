@@ -15,6 +15,7 @@ ghav [-r owner/repo] [command] [args]
   credits <ghsa>          manage credited people and roles in the TUI
   edit <ghsa>             edit advisory in $EDITOR
   review <ghsa> [context] let the AI review/rewrite it, then edit
+  similar <ghsa|commit|url> [context] find similar bugs using the selection as a template
   resume <directory>     continue saved work without running the AI again
   cve <ghsa>              request a CVE id (asynchronous)
   approve <ghsa>          alias for cve
@@ -31,7 +32,7 @@ The repository is resolved in this order:
 
 1. `-r owner/repo`
 2. `$GHAV_REPO`
-3. The GitHub URL for `new <url>` (must match an explicit repository above)
+3. The GitHub URL for `new <url>` or `similar <url>` (must match an explicit repository above)
 4. `gh repo view --json nameWithOwner` in the current directory
 
 If none works, `ghav` exits with `cannot find repository, use -r owner/repo or GHAV_REPO`.
@@ -102,6 +103,19 @@ The label is not removed after draft creation or CVE requests.
 opens a diff for you to accept or reject line by line. See [the advisory](advisory-format.md)
 for the diff rules.
 
+### similar
+
+`ghav similar <ghsa|commit|url> [context]` asks the agent to find other bugs with the same
+root cause as the selected advisory or source. It includes an advisory referencing the
+commit or issue/PR when available, and lists existing advisories for duplicate checking.
+The agent investigates the current checkout and returns a Markdown findings report with
+locations, triggers, evidence and confidence. Optional context narrows the search.
+
+The report opens in the Markdown viewer (`r2`, otherwise `$PAGER`) and is saved as
+`reply.txt` in the printed recovery directory. `ghav resume <directory>` reopens it
+without calling the AI. No advisory is created or updated. Press `b` in the TUI for
+the same workflow. See [the search prompt](ai-agent.md#finding-similar-bugs).
+
 ### credits
 
 `ghav credits <ghsa>` opens the credits TUI without running an AI agent. Add, edit or
@@ -116,6 +130,9 @@ using the recovery path printed before work began. It reopens the saved edits an
 the saved repository and advisory ID, without calling the AI. Review errors offer
 repairing the diff, using the full AI version, manual editing, or quitting while keeping
 the files. See [recovery](advisory-format.md#recovery) for the files and Ctrl+C behavior.
+
+For `similar`, it reopens the saved findings report, including partial output, without
+running the AI or updating GitHub. Reports remain in the recovery directory after viewing.
 
 ### cve / approve
 

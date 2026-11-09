@@ -20,6 +20,7 @@ $ ghav new 8f3a2c1 found by fuzzing the PDB parser
 - **Drafts** an advisory from a commit or GitHub issue/PR URL: the agent reads the report, discussion, patch when available, history and
   tags, and writes root cause, CWE, CVSS and the affected/patched versions.
 - **Reviews** existing advisories with the agent as a diff you accept or reject line by line.
+- **Finds similar bugs** using an advisory, its CVE or a fix commit as a template for an AI search.
 - **Manages credits** in a dedicated TUI screen for finders, reporters, fix authors and
   other contributors, with a picker explaining every supported role.
 - **Requests CVEs**, including for published advisories, accepts private reports as drafts,
@@ -47,8 +48,9 @@ so V includes every source file.
 
 Run the focused source, advisory-link and review-diff tests with
 `v test ghadv_test.v workflow_test.v credits_test.v`. After building, run
-`python3 test/workflow.py /path/to/ghav` for recovery checks and
-`python3 test/credits.py /path/to/ghav` for the credits TUI and API checks. Both use stub
+`python3 test/workflow.py /path/to/ghav` for recovery checks,
+`python3 test/credits.py /path/to/ghav` for the credits TUI and API checks, and
+`python3 test/similar.py /path/to/ghav` for similar-bug searches. These use stub
 commands and do not access GitHub or run an AI agent.
 
 The source files share one V module:
@@ -58,7 +60,7 @@ The source files share one V module:
 | `ghadv.v` | argument parsing, help and command dispatch |
 | `github.v` | repository-scoped `GitHub` API, `gh` requests, endpoints and JSON serialization |
 | `tui.v` | terminal views, row formatting, navigation and action prompts |
-| `workflow.v` | draft creation, AI review, editor handling and review diffs |
+| `workflow.v` | draft creation, AI review and bug searches, editor handling and review diffs |
 | `advisory.v` | advisory types, editable format parsing and source linking |
 | `sources.v` | commit/issue/PR URL parsing and local fix-commit discovery |
 
@@ -81,6 +83,7 @@ ghav [-r owner/repo] [command] [args]
   credits <ghsa>          manage credited people and roles in the TUI
   edit <ghsa>             edit an advisory in $EDITOR
   review <ghsa> [context] AI-review and rewrite it, then edit
+  similar <ghsa|commit|url> [context] find similar bugs using the selection as a template
   resume <directory>     continue saved work without running the AI again
   cve <ghsa>              request a CVE id (asynchronous)
   approve <ghsa>          alias for cve
@@ -104,9 +107,29 @@ if you leave the diff unchanged. Empty the file to abort. A successful save prin
 editable fields. A mismatch or reload failure keeps your recovery files and reports the
 problem. Changes only to comments or formatting do not count as a saved advisory change.
 At the following prompt, enter `v` to view the current advisory, `r` to run another review
-with fresh context, or `e` to edit it. Press Enter alone to return to the list and reload it.
+with fresh context, `b` to find similar bugs, or `e` to edit it. Press Enter alone to return
+to the list and reload it.
 If there are no changes, the review notes are shown without opening an empty diff.
 Failed AI replies are displayed with their recovery path and do not update GitHub.
+
+Press **`b`** (or choose **Find similar bugs** from `m`) to search for related mistakes.
+The selected advisory, including its CVE and references, becomes the template. On a commit
+or issue/PR, the search uses that source and includes its linked advisory when available;
+an advisory is not required. The optional context can narrow the search, for example:
+"Look for the same missing bounds check in related parsers and callers." Enter starts;
+Escape or Ctrl+C cancels. It uses the same `GHAV_AI` agent as review.
+
+The agent checks the root cause and fix, searches the current checkout for related bugs,
+and reports locations, triggers, evidence, confidence and verification steps, separating
+unverified leads from confirmed findings. Results open in the Markdown viewer and stay in
+`reply.txt` in the printed recovery directory, alongside the source evidence and prompt.
+`ghav resume <directory>` reopens the saved report without running the AI again. The
+workflow does not create or update advisories. From the CLI:
+
+```sh
+ghav similar GHSA-xxxx-yyyy-zzzz check sibling parsers
+ghav similar 8f3a2c1 look for other callers missing this check
+```
 
 Press **`C`** on an advisory (or choose it from `m`) to manage credits. You can also open
 that screen directly with `ghav credits GHSA-xxxx-yyyy-zzzz`. Use `a` to add, `e` to edit,
@@ -153,7 +176,7 @@ In the TUI, `requested*` records a CVE request accepted during this session. Rel
 
 Press `enter` on an advisory to render its Markdown with `r2 -q -c "cat -m file.md" --`
 when `r2` is on `PATH`. Otherwise it opens in `$PAGER` (default: `less`). After closing
-the viewer, the same `v`/`r`/`e` prompt lets you continue working on that advisory;
+the viewer, the same `v`/`r`/`b`/`e` prompt lets you continue working on that advisory;
 press Enter alone to return to the list. Every view and AI review fetches it from GitHub.
 
 Agents: `claude -p` (default), `codex exec -`, `pmai` — anything that reads a prompt on

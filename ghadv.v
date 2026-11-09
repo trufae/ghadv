@@ -13,6 +13,7 @@ const help = 'Usage: ghav [-r owner/repo] [command] [args]
   credits <ghsa>           manage credited people and roles in the TUI
   edit <ghsa>              edit advisory in \$EDITOR
   review <ghsa> [context]  let the AI review/rewrite it, then edit
+  similar <ghsa|commit|url> [context] find similar bugs using the selection as a template
   resume <directory>       continue saved work without running the AI again
   cve <ghsa>               request a CVE id (asynchronous)
   approve <ghsa>           alias for cve
@@ -51,7 +52,7 @@ fn main() {
 		}
 		return
 	}
-	if cmd == 'new' && id != '' {
+	if id != '' && (cmd == 'new' || (cmd == 'similar' && !id.starts_with('GHSA-'))) {
 		s := source(repo, id) or {
 			eprintln(err)
 			exit(1)
@@ -121,6 +122,12 @@ fn main() {
 		}
 		'review' {
 			cmd_review(api, id, ctx) or {
+				eprintln('error: ${err}')
+				exit(1)
+			}
+		}
+		'similar' {
+			cmd_similar(api, id, ctx) or {
 				eprintln('error: ${err}')
 				exit(1)
 			}

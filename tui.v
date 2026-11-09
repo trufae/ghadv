@@ -5,6 +5,7 @@ import term
 
 const tui_help = 'tab: switch advisories/commits/issues; j/k or mouse wheel: move; J/K: move ten rows
 enter: view advisory/commit/issue/PR; e: edit; r: AI review; n: new draft
+b: find similar bugs using the selected advisory or source as a template
 C: manage advisory credits (finder, reporter, fix developer and other roles)
 c (or a): request CVE; d: accept/reopen as draft; p: publish; x: close
 s: advisory status; m: actions menu; f: cycle advisory state filter
@@ -161,6 +162,14 @@ fn run(k string, api GitHub, id string, input string) ! {
 		'e', 'r' {
 			advisory_tui(api, id, k)!
 		}
+		'b' {
+			if input == '' {
+				advisory_tui(api, id, k)!
+			} else {
+				if !similar_tui(api, input)! { return }
+				action_input('Press Enter to return (Ctrl+C/Esc also returns): ') or {}
+			}
+		}
 		'n' {
 			args := if input != '' {
 				input
@@ -188,13 +197,23 @@ fn run(k string, api GitHub, id string, input string) ! {
 	}
 }
 
-// Stay on the same advisory while viewing, editing and reviewing successive versions.
+fn similar_tui(api GitHub, input string) !bool {
+	println('Find similar bugs with AI using ${input} as a template; results open as a saved report.')
+	println('Example: Look for the same missing bounds check in related parsers and callers.')
+	println('Enter to search; Ctrl+C or Esc to cancel. Ctrl+C also cancels the running AI.')
+	ctx := action_input('extra context (optional): ') or { return false }
+	tui_workflow(api, 'similar', input, ctx)!
+	return true
+}
+
+// Stay on the same advisory while viewing, editing, reviewing and finding related bugs.
 fn advisory_tui(api GitHub, id string, first string) ! {
 	mut action := first
 	for {
 		match action {
 			'v' { view_text(api.advisory(id)!)! }
 			'e' { tui_workflow(api, 'edit', id)! }
+			'b' { if !similar_tui(api, id)! { return } }
 			'r' {
 				println('Review ${id} with AI, then inspect its proposed changes in \$EDITOR.')
 				println('Example: Check the affected versions and whether the fix addresses the root cause.')
@@ -204,8 +223,8 @@ fn advisory_tui(api GitHub, id string, first string) ! {
 			}
 			else {}
 		}
-		action = action_input('[v]iew advisory, [r] AI review, [e]dit. Press Enter to return: ') or { return }
-		if action !in ['v', 'r', 'e'] { return }
+		action = action_input('[v]iew advisory, [r] AI review, [b] similar bugs, [e]dit. Press Enter to return: ') or { return }
+		if action !in ['v', 'r', 'b', 'e'] { return }
 	}
 }
 
@@ -566,7 +585,7 @@ fn tui(api GitHub, label string) {
 			'No advisory selected; n creates a draft from a commit, issue or PR'
 		}
 		out += '\x1b[${h - 2};1H' + hint#[..w - 1] + '\n'
-		out += key_hints(['m actions', 'C credits', 's status', ...actions, 'g reload', 'A agent'], w - 1) + '\n'
+		out += key_hints(['m actions', 'b similar bugs', 'C credits', 's status', ...actions, 'g reload', 'A agent'], w - 1) + '\n'
 		out += key_hints(['? help', 'q quit', 'tab views', 'j/k/J/K move', 'enter view', 'e edit',
 			'r review', 'n new', 'f filter'], w - 1)
 		print(out)
@@ -584,12 +603,12 @@ fn tui(api GitHub, label string) {
 			for action in actions {
 				println(key_hints([action], w - 1))
 			}
-			println('s status details\nv view advisory\ne edit advisory\nr AI review\nC manage credits\n\nChoose a key; Enter/Esc cancels.')
+			println('s status details\nv view advisory\ne edit advisory\nr AI review\nb Find similar bugs\nC manage credits\n\nChoose a key; Enter/Esc cancels.')
 			k = key(false)
 			if k == 'v' {
 				k = '\n'
 				show_input = ''
-			} else if k !in ['s', 'e', 'r', 'C'] && !actions.any(it.starts_with(k + ' ')) {
+			} else if k !in ['s', 'e', 'r', 'b', 'C'] && !actions.any(it.starts_with(k + ' ')) {
 				continue
 			}
 		}
@@ -639,8 +658,8 @@ fn tui(api GitHub, label string) {
 				cms = commits() or { [['error:', err.msg()]] }
 				items = api.issues(label) or { [['error:', err.msg()]] }
 			}
-			'\n', '\r', 'e', 'r', 'n', 's', 'C', '?' {
-				if id == '' && (k in ['e', 'r', 's', 'C'] || (k in ['\n', '\r'] && input == '')) {
+			'\n', '\r', 'e', 'r', 'b', 'n', 's', 'C', '?' {
+				if id == '' && (k in ['e', 'r', 's', 'C'] || (k in ['\n', '\r', 'b'] && input == '')) {
 					status = 'no advisory selected; press n to create a draft'
 					continue
 				}

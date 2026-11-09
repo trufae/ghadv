@@ -31,6 +31,7 @@ Keys:
 | `n` | draft from the selected commit or issue/PR; in the advisory view, prompt for a commit or URL and optional context |
 | `e` | edit the linked advisory |
 | `r` | AI-review the linked advisory |
+| `b` | find similar bugs using the selected advisory or source as a template |
 | `C` | manage credited people and roles for the linked advisory |
 | `m` | open the selected advisory's actions menu |
 | `c` / `a` | request a CVE, including for a published advisory |
@@ -49,6 +50,14 @@ the selected item. If there is none, press `n` to prepare a draft, review it in 
 then `c` to request a CVE. Issue/PR links require their full URL in the advisory description.
 Creating a draft does not request a CVE, publish, or remove the label.
 
+`b` also works on commits and issues/PRs without a linked advisory. It prompts for optional
+search instructions, such as "Look for the same missing bounds check in related parsers
+and callers." Enter starts; Escape or Ctrl+C cancels. The selected source and any linked
+advisory are sent to the configured AI, which searches the current checkout for related
+mistakes. The findings report opens in the Markdown viewer; it does not update an advisory.
+The source, prompt and reply remain in the printed recovery directory. Use
+`ghav resume <directory>` to reopen the report. See [the search prompt](ai-agent.md#finding-similar-bugs).
+
 The `r` prompt accepts optional review instructions, for example: "Check the affected
 versions and whether the fix addresses the root cause." Press Enter to start, or Ctrl+C
 or Escape to cancel without running the AI. The `n` input prompt accepts the same cancel
@@ -58,8 +67,8 @@ editor also returns to the list with terminal settings restored; unsaved editor 
 cannot be recovered by `ghav`.
 
 After a review or edit, enter `v` to view the current advisory, `r` to review it again
-with new context, or `e` to edit it. The same prompt appears after closing the advisory
-viewer. Enter alone, Escape or Ctrl+C returns to the list. Views and reviews fetch the
+with new context, `b` to find similar bugs, or `e` to edit it. The same prompt appears after
+closing the advisory viewer. Enter alone, Escape or Ctrl+C returns to the list. Views and reviews fetch the
 advisory from GitHub each time. A save is reported only after reloading and checking the
 editable fields; verification failures retain the recovery files.
 
