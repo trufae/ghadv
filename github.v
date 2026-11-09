@@ -137,4 +137,15 @@ fn (api GitHub) create_advisory(a Adv) !string {
 
 fn (api GitHub) update_advisory(id string, a Adv) ! {
 	send('PATCH', 'repos/${api.repo}/security-advisories/${id}', json2.encode(a))!
+	// A successful request alone does not prove the edited fields were saved.
+	text := api.advisory(id) or {
+		return error('GitHub accepted the update, but reloading ${id} failed: ${err}')
+	}
+	saved := parse(text) or {
+		return error('GitHub accepted the update, but the reloaded advisory is invalid: ${err}')
+	}
+	fields := advisory_changes(a, saved)
+	if fields.len > 0 {
+		return error('GitHub accepted the update, but the reloaded advisory differs in: ${fields.join(', ')}')
+	}
 }

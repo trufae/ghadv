@@ -98,6 +98,26 @@ fn csv(s string) []string {
 	return s.split(',').map(it.trim_space()).filter(it != '')
 }
 
+// Compare editable values, ignoring the order of sets and GitHub username casing.
+fn advisory_changes(a Adv, b Adv) []string {
+	mut fields := []string{}
+	if a.summary != b.summary { fields << 'summary' }
+	if a.description != b.description { fields << 'description' }
+	if a.severity != b.severity { fields << 'severity' }
+	if a.cvss_vector_string != b.cvss_vector_string { fields << 'cvss' }
+	if a.cwe_ids.sorted() != b.cwe_ids.sorted() { fields << 'cwe' }
+	if a.credits.map(it.login.to_lower() + ':' + it.typ).sorted()
+		!= b.credits.map(it.login.to_lower() + ':' + it.typ).sorted() {
+		fields << 'credits'
+	}
+	mut av := a.vulnerabilities.clone()
+	mut bv := b.vulnerabilities.clone()
+	for mut v in av { v.vulnerable_functions = v.vulnerable_functions.sorted() }
+	for mut v in bv { v.vulnerable_functions = v.vulnerable_functions.sorted() }
+	if av.map(it.str()).sorted() != bv.map(it.str()).sorted() { fields << 'vulnerabilities' }
+	return fields
+}
+
 fn parse(text string) !Adv {
 	sep := text.index('\n---\n') or { return error('missing --- separator') }
 	mut a := Adv{

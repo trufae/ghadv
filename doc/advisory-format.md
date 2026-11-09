@@ -47,9 +47,12 @@ with the reviewer notes above it. Editing the diff is the verdict:
 The diff (produced with `diff -U 99999`, labeled `advisory` and `review`) is applied back
 to the advisory and sent as a `PATCH`. Leaving the diff unchanged accepts all proposed
 changes; emptying the file or producing the original advisory aborts. If the AI proposes
-no changes, its notes are shown without opening the editor. A successful update prints
-`Saved changes to <ghsa> on GitHub.`; the TUI's return prompt only returns to the list
-and does not apply anything itself.
+no changes, its notes are shown without opening the editor. Changes only to comments or
+formatting also abort without a save. After updating, `ghav` reloads the advisory and
+compares its editable fields before printing `Saved changes to <ghsa> on GitHub.`.
+If the reloaded fields differ or cannot be fetched, the error is shown and recovery
+files are kept. In the TUI, enter `v` at the following prompt to view the current version,
+`r` to review it again, or `e` to edit it; Enter alone returns to the list.
 
 ## Recovery
 

@@ -57,6 +57,12 @@ returns to the list, keeping the recovery files printed before it started. An in
 editor also returns to the list with terminal settings restored; unsaved editor buffers
 cannot be recovered by `ghav`.
 
+After a review or edit, enter `v` to view the current advisory, `r` to review it again
+with new context, or `e` to edit it. The same prompt appears after closing the advisory
+viewer. Enter alone, Escape or Ctrl+C returns to the list. Views and reviews fetch the
+advisory from GitHub each time. A save is reported only after reloading and checking the
+editable fields; verification failures retain the recovery files.
+
 The bottom two rows separate colored keys from descriptions. The action row and `m` menu
 offer actions appropriate to the selected advisory's state and CVE assignment. The status
 line above them shows the selection or the result of the last action. All lifecycle and
@@ -120,7 +126,8 @@ available in the regular editor.
 
 ## Terminal behavior
 
-After viewing an advisory with `r2`, press `enter` to return to the list.
+After leaving the `r2` or pager view, use the advisory action prompt to view, review or
+edit again, or press Enter to return to the list.
 
 Mouse reporting is enabled while the TUI is active, so the wheel moves the selection
 instead of the terminal scrollback. It is disabled when opening a viewer, editor or

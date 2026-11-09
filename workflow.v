@@ -171,6 +171,12 @@ fn edit(dir string, orig string) ?Adv {
 		if problem == '' {
 			if res.trim_space() == '' || res == orig { return none }
 			if a := parse(res) {
+				if original := parse(orig) {
+					if advisory_changes(original, a).len == 0 {
+						println('No advisory fields changed; GitHub was not updated.')
+						return none
+					}
+				}
 				return a
 			} else {
 				problem = 'Invalid advisory: ${err}'

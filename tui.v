@@ -108,7 +108,6 @@ fn tui_workflow(api GitHub, args ...string) ! {
 		return error_with_code('cancelled; recovery files, if created, are at the path printed above', 130)
 	}
 	if code != 0 { eprintln('Workflow exited with status ${code}') }
-	action_input('Press Enter to return (Ctrl+C/Esc also returns): ') or {}
 }
 
 // A cancellable line prompt, with the same key handling as the TUI forms.
@@ -159,15 +158,8 @@ fn run(k string, api GitHub, id string, input string) ! {
 		'C' {
 			credits_tui(api, id)!
 		}
-		'e' {
-			tui_workflow(api, 'edit', id)!
-		}
-		'r' {
-			println('Review ${id} with AI, then inspect its proposed changes in \$EDITOR.')
-			println('Example: Check the affected versions and whether the fix addresses the root cause.')
-			println('Enter to review; Ctrl+C or Esc to cancel. Ctrl+C also cancels the running AI.')
-			ctx := action_input('extra context (optional): ') or { return }
-			tui_workflow(api, 'review', id, ctx)!
+		'e', 'r' {
+			advisory_tui(api, id, k)!
 		}
 		'n' {
 			args := if input != '' {
@@ -179,29 +171,52 @@ fn run(k string, api GitHub, id string, input string) ! {
 			if trimmed != '' {
 				ctx := if trimmed.contains(' ') { trimmed.all_after_first(' ') } else { '' }
 				tui_workflow(api, 'new', trimmed.all_before(' '), ctx)!
+				action_input('Press Enter to return (Ctrl+C/Esc also returns): ') or {}
 			}
 		}
 		else {
+			if input == '' {
+				advisory_tui(api, id, 'v')!
+				return
+			}
 			if input != '' && !input.starts_with('https://') {
 				os.system_args(['git', 'show', input])
 				return
 			}
-			name := if input != '' { 'source-${os.getpid()}' } else { id }
-			path := os.join_path(os.temp_dir(), 'ghav-${name}.md')
-			text := if input != '' {
-				api.source_text(source(api.repo, input)!, false)!
-			} else {
-				api.advisory(id)!
-			}
-			os.write_file(path, text)!
-			if os.exists_in_system_path('r2') {
-				// The leading quote bypasses r2 command parsing for the filename.
-				os.system_args(['r2', '-q', '-c', "cat -m ${path}~..", '--'])
-			} else {
-				sh('${os.getenv_opt('PAGER') or { 'less' }} "\$1"', path)
-			}
-			os.rm(path)!
+			view_text(api.source_text(source(api.repo, input)!, false)!)!
 		}
+	}
+}
+
+// Stay on the same advisory while viewing, editing and reviewing successive versions.
+fn advisory_tui(api GitHub, id string, first string) ! {
+	mut action := first
+	for {
+		match action {
+			'v' { view_text(api.advisory(id)!)! }
+			'e' { tui_workflow(api, 'edit', id)! }
+			'r' {
+				println('Review ${id} with AI, then inspect its proposed changes in \$EDITOR.')
+				println('Example: Check the affected versions and whether the fix addresses the root cause.')
+				println('Enter to review; Ctrl+C or Esc to cancel. Ctrl+C also cancels the running AI.')
+				ctx := action_input('extra context (optional): ') or { return }
+				tui_workflow(api, 'review', id, ctx)!
+			}
+			else {}
+		}
+		action = action_input('[v]iew advisory, [r] AI review, [e]dit. Press Enter to return: ') or { return }
+		if action !in ['v', 'r', 'e'] { return }
+	}
+}
+
+fn view_text(text string) ! {
+	path := os.join_path(os.temp_dir(), 'ghav-view-${os.getpid()}.md')
+	os.write_file(path, text)!
+	defer { os.rm(path) or {} }
+	if os.exists_in_system_path('r2') {
+		os.system_args(['r2', '-q', '-c', "cat -m ${path}~..", '--'])
+	} else {
+		sh('${os.getenv_opt('PAGER') or { 'less' }} "\$1"', path)
 	}
 }
 

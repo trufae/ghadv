@@ -37,19 +37,41 @@ if name == 'gh':
             (root / 'fail-api').unlink()
             print('HTTP 422: rejected advisory', file=sys.stderr)
             sys.exit(1)
-        if os.environ.get('GH_PERSIST'):
+        if not os.environ.get('GH_DROP_SAVE'):
             (root / 'saved.json').write_text(payload)
         print('GHSA-test')
     elif '--paginate' in args:
         summary = 'Test advisory'
-        if os.environ.get('GH_PERSIST') and (root / 'saved.json').exists():
+        if (root / 'saved.json').exists():
             summary = json.loads((root / 'saved.json').read_text())['summary']
         print('GHSA-test\\tdraft\\t-\\thigh\\t' + summary + '\\t\\t')
     else:
-        print((root / 'original').read_text(), end='')
+        if (root / 'saved.json').exists():
+            if (root / 'fail-reload').exists():
+                (root / 'fail-reload').unlink()
+                print('HTTP 503: reload unavailable', file=sys.stderr)
+                sys.exit(1)
+            a = json.loads((root / 'saved.json').read_text())
+            lines = ['# GHSA-test draft', 'summary: ' + a['summary'],
+                     'severity: ' + a.get('severity', ''),
+                     'cvss: ' + a.get('cvss_vector_string', ''),
+                     'cwe: ' + ', '.join(a.get('cwe_ids', [])),
+                     'credits: ' + ', '.join(c['login'] + ':' + c['type']
+                                             for c in a.get('credits', []))]
+            for v in a.get('vulnerabilities', []):
+                lines += ['package: ' + v['package']['name'],
+                          'ecosystem: ' + v['package']['ecosystem'],
+                          'affected: ' + v.get('vulnerable_version_range', ''),
+                          'patched: ' + v.get('patched_versions', ''),
+                          'functions: ' + ', '.join(v.get('vulnerable_functions', []))]
+            print('\\n'.join(lines + ['---', a['description']]))
+        else:
+            print((root / 'original').read_text(), end='')
 elif name == 'ai':
     with (root / 'ai.calls').open('a') as f:
         f.write('run\\n')
+    with (root / 'ai.prompts').open('a') as f:
+        f.write(json.dumps(sys.stdin.read()) + '\\n')
     print((root / 'reply').read_text(), end='', flush=True)
     if os.environ.get('AI_WAIT'):
         signal.signal(signal.SIGINT, lambda *_: sys.exit(130))
@@ -59,6 +81,12 @@ elif name == 'ai':
         finally:
             (root / 'ai.stopped').touch()
     sys.exit(int(os.environ.get('AI_EXIT', '0')))
+elif name == 'r2':
+    command = sys.argv[sys.argv.index('-c') + 1]
+    path = command.removeprefix('cat -m ').removesuffix('~..')
+    text = Path(path).read_text()
+    (root / 'viewed.md').write_text(text)
+    print(text, end='')
 else:
     path = Path(sys.argv[1])
     (root / 'editor-buffer').write_text(path.read_text())
@@ -72,6 +100,8 @@ else:
         sys.exit(2)
     if mode == 'empty':
         path.write_text('')
+    if mode == 'comment':
+        path.write_text('# Only a comment changed\\n' + path.read_text())
     if path.suffix == '.diff':
         if mode in ('broken', 'manual', 'retry'):
             if mode == 'retry' and (root / 'clean.diff').exists():
@@ -93,6 +123,9 @@ def saved_dir(output):
 
 
 def run(binary, root, mode='', answer='', args=None, **extra):
+    # Each CLI scenario starts with the original unless explicitly continuing it.
+    if not extra.get('GH_PERSIST'):
+        (root / 'saved.json').unlink(missing_ok=True)
     env = os.environ | {
         'PATH': str(root) + os.pathsep + os.environ['PATH'],
         'TEST_ROOT': str(root), 'TMPDIR': str(root),
@@ -107,7 +140,7 @@ def run(binary, root, mode='', answer='', args=None, **extra):
 
 
 def setup(root):
-    for name in ('gh', 'ai', 'editor'):
+    for name in ('gh', 'ai', 'editor', 'r2'):
         (root / name).write_text(STUB)
         (root / name).chmod(0o700)
     for name, text in [('original', ORIGINAL), ('reply', REPLY), ('manual', MANUAL)]:
@@ -120,6 +153,7 @@ def payload(root):
 
 def tui_checks(binary, root):
     env = {'GHAV_AI': 'ai', 'EDITOR': 'editor', 'EDITOR_MODE': ''}
+    (root / 'saved.json').unlink(missing_ok=True)
     # Accepting the unchanged review diff must PATCH the AI version, report success,
     # and reload the updated advisory before displaying the list again.
     with Terminal(binary, root, 'tui', env | {'GH_PERSIST': '1'}, controlling=True) as ui:
@@ -134,11 +168,35 @@ def tui_checks(binary, root):
         assert payload(root)['description'] == 'After'
         assert '+summary: Revised' in (root / 'editor-buffer').read_text()
         assert not saved_dir(screen.replace('\r', '')).exists()
+        # Reopen the server version and request another review from that view.
+        ui.send('v\n')
+        ui.expect('summary: Revised')
+        screen = ui.expect('Press Enter to return')
+        assert 'summary: Revised' in screen and 'After' in screen, screen
+        assert 'summary: Revised' in (root / 'viewed.md').read_text()
+        (root / 'reply').write_text(REPLY.replace('Revised', 'Second review').replace('After', 'Final text'))
+        ui.send('r\n')
+        ui.expect('extra context (optional):')
+        ui.send('Check the revised wording\n')
+        screen = ui.expect('Press Enter to return')
+        assert 'Saved changes to GHSA-test on GitHub.' in screen
+        prompt = json.loads((root / 'ai.prompts').read_text().splitlines()[-1])
+        assert 'summary: Revised' in prompt and 'After' in prompt
+        assert 'Extra context: Check the revised wording' in prompt
+        assert payload(root)['description'] == 'Final text'
         ui.send('\n')
-        ui.expect('Revised')
+        ui.expect('Second review')
+        ui.send('\n')
+        ui.expect('summary: Second review')
+        screen = ui.expect('Press Enter to return')
+        assert 'summary: Second review' in screen and 'Final text' in screen, screen
+        ui.send('\x1b')
+        ui.expect('C credits')
         ui.send('q')
         ui.finish()
 
+    (root / 'saved.json').unlink(missing_ok=True)
+    (root / 'reply').write_text(REPLY)
     before = (root / 'payload.json').read_text()
     writes = [line for line in (root / 'gh.calls').read_text().splitlines()
               if '--input' in json.loads(line)]
@@ -250,6 +308,32 @@ def checks(binary, root):
     assert payload(root)['description'] == 'After'
     assert 'Saved changes to GHSA-test on GitHub.' in result.stdout
     assert not saved_dir(result.stdout).exists()
+
+    # A successful gh exit with unchanged server content must not claim a save.
+    result, _ = run(binary, root, GH_DROP_SAVE='1')
+    assert result.returncode != 0, result.stdout
+    assert 'reloaded advisory differs in: summary, description' in result.stdout
+    assert 'Saved changes to' not in result.stdout
+    directory = saved_dir(result.stdout)
+    assert (directory / 'result.md').read_text().endswith('After\n')
+    assert (directory / 'review.diff').exists()
+    result, _ = run(binary, root, args=['resume', str(directory)])
+    assert result.returncode == 0, result.stdout
+    assert not directory.exists()
+
+    # A PATCH followed by a read failure is unverified; preserve the recovery files.
+    (root / 'fail-reload').touch()
+    result, _ = run(binary, root)
+    assert result.returncode != 0, result.stdout
+    assert 'reloading GHSA-test failed: HTTP 503' in result.stdout
+    assert 'Saved changes to' not in result.stdout
+    assert (saved_dir(result.stdout) / 'result.md').exists()
+
+    # Textual changes to comments alone do not change any submitted advisory fields.
+    result, _ = run(binary, root, 'comment', args=['-r', 'owner/repo', 'edit', 'GHSA-test'])
+    assert result.returncode == 0, result.stdout
+    assert 'No advisory fields changed; GitHub was not updated.' in result.stdout
+    assert 'Saved changes to' not in result.stdout
 
     # An unchanged advisory should show the AI notes and explain the lack of a PATCH.
     before = (root / 'payload.json').read_text()

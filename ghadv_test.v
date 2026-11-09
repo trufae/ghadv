@@ -1,5 +1,23 @@
 module main
 
+fn test_advisory_changes_compare_saved_fields() ! {
+	a := parse('summary: Test\nseverity: high\ncvss: CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H\ncwe: CWE-787, CWE-125\ncredits: Alice:finder, Bob:reporter\npackage: one\necosystem: other\naffected: < 2\npatched: 2\nfunctions: foo, bar\npackage: two\n---\nDetails\n')!
+	mut b := a
+	b.cwe_ids = a.cwe_ids.reverse()
+	b.credits = [Credit{'bob', 'reporter'}, Credit{'alice', 'finder'}]
+	b.vulnerabilities = a.vulnerabilities.reverse()
+	b.vulnerabilities[1].vulnerable_functions = ['bar', 'foo']
+	assert advisory_changes(a, b) == []string{}
+	b.summary = 'Different'
+	b.description = 'Changed body'
+	b.cvss_vector_string = ''
+	b.severity = 'low'
+	b.cwe_ids = []string{}
+	b.credits = []Credit{}
+	b.vulnerabilities = []Vuln{}
+	assert advisory_changes(a, b) == ['summary', 'description', 'severity', 'cvss', 'cwe', 'credits', 'vulnerabilities']
+}
+
 fn test_advisory_sources() ! {
 	commit := source('owner/repo', 'abc1234')!
 	assert commit.kind == 'commit'

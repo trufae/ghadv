@@ -100,7 +100,11 @@ example, such as "Check the affected versions and whether the fix addresses the 
 cause." Enter starts the review; Ctrl+C or Escape cancels and returns to the list.
 The proposed patch opens in `$EDITOR`; closing it accepts the remaining changes, even
 if you leave the diff unchanged. Empty the file to abort. A successful save prints
-`Saved changes to <ghsa> on GitHub.` before the return prompt, then the list reloads.
+`Saved changes to <ghsa> on GitHub.` only after reloading the advisory and verifying its
+editable fields. A mismatch or reload failure keeps your recovery files and reports the
+problem. Changes only to comments or formatting do not count as a saved advisory change.
+At the following prompt, enter `v` to view the current advisory, `r` to run another review
+with fresh context, or `e` to edit it. Press Enter alone to return to the list and reload it.
 If there are no changes, the review notes are shown without opening an empty diff.
 Failed AI replies are displayed with their recovery path and do not update GitHub.
 
@@ -148,8 +152,9 @@ In the TUI, `requested*` records a CVE request accepted during this session. Rel
 `g` to check for the assigned ID; GitHub REST does not expose a pending-request status.
 
 Press `enter` on an advisory to render its Markdown with `r2 -q -c "cat -m file.md" --`
-when `r2` is on `PATH`, then press `enter` to return. Otherwise it opens in `$PAGER`
-(default: `less`).
+when `r2` is on `PATH`. Otherwise it opens in `$PAGER` (default: `less`). After closing
+the viewer, the same `v`/`r`/`e` prompt lets you continue working on that advisory;
+press Enter alone to return to the list. Every view and AI review fetches it from GitHub.
 
 Agents: `claude -p` (default), `codex exec -`, `pmai` — anything that reads a prompt on
 stdin.
