@@ -8,7 +8,8 @@ enter: view advisory/commit/issue/PR; e: edit; r: AI review; n: new draft
 b: find similar bugs using the selected advisory or source as a template
 C: manage advisory credits (finder, reporter, fix developer and other roles)
 c (or a): request CVE; d: accept/reopen as draft; p: publish; x: close
-s: advisory status; m: actions menu; f: cycle advisory state filter
+s: advisory status; m: actions menu; f/F: next/previous advisory state filter
+/: filter the current list by text (Enter applies; empty clears; Esc cancels)
 g: reload; A: cycle AI agent
 ?: this help; q or Ctrl+C: quit
 
@@ -495,6 +496,7 @@ fn tui(api GitHub, label string) {
 	mut top := [0, 0, 0]
 	mut status := ''
 	mut filter := 0
+	mut queries := ['', '', '']
 	mut cve_requested := map[string]bool{}
 	raw()
 	for {
@@ -502,29 +504,36 @@ fn tui(api GitHub, label string) {
 		if w < 20 || h < 6 {
 			w, h = 80, 24
 		}
-		mut visible := []int{}
-		for i, a in advs {
-			if filter == 0 || (a.len > 1 && a[1] == states[filter]) {
-				visible << i
+		mut visible := [][]int{len: 3}
+		for v, entries in [advs, cms, items] {
+			query := queries[v].to_lower()
+			for i, entry in entries {
+				mut text := entry.join(' ')
+				if v != 0 && query != '' && entry.len > 0 {
+					linked := adv_of(advs, entry[0])
+					if linked >= 0 { text += ' ' + advs[linked][0] }
+				}
+				if text.to_lower().contains(query) { visible[v] << i }
 			}
 		}
-		page := h - 5
-		n := match view {
-			0 { visible.len }
-			1 { cms.len }
-			else { items.len }
+		advisory_matches := visible[0].clone()
+		if filter != 0 {
+			visible[0] = visible[0].filter(advs[it].len > 1 && advs[it][1] == states[filter])
 		}
+		page := h - 5
+		n := visible[view].len
 		sel[view] = if n == 0 { 0 } else { int_min(int_max(sel[view], 0), n - 1) }
 		top[view] = int_min(int_max(top[view], sel[view] - page + 1), sel[view])
-		input := if view == 1 && cms.len > 0 && cms[sel[1]].len > 2 {
-			cms[sel[1]][0]
-		} else if view == 2 && items.len > 0 && items[sel[2]].len >= 5 {
-			items[sel[2]][0]
+		selected := if n > 0 { visible[view][sel[view]] } else { -1 }
+		input := if view == 1 && selected >= 0 && cms[selected].len > 2 {
+			cms[selected][0]
+		} else if view == 2 && selected >= 0 && items[selected].len >= 5 {
+			items[selected][0]
 		} else {
 			''
 		}
 		ai := if view == 0 {
-			if visible.len > 0 { visible[sel[0]] } else { -1 }
+			selected
 		} else {
 			adv_of(advs, input)
 		}
@@ -534,9 +543,9 @@ fn tui(api GitHub, label string) {
 		} else {
 			[]string{}
 		}
-		mut tabs := ['advisories ${visible.len} (${states[filter]})', 'commits ${cms.len}']
+		mut tabs := ['advisories ${visible[0].len} (${states[filter]})', 'commits ${visible[1].len}']
 		if label != '' {
-			tabs << 'issues/PRs ${items.len} (${label})'
+			tabs << 'issues/PRs ${visible[2].len} (${label})'
 		}
 		header := 'ghav ${api.repo} | ' + tabs.map(if it == tabs[view] { '[${it}]' } else { it }).join(' | ')
 		columns := if view == 0 {
@@ -549,23 +558,26 @@ fn tui(api GitHub, label string) {
 		mut out := '\x1b[H\x1b[2J' + term.bold(header#[..w - 1]) + '\n' +
 			term.dim(columns#[..w - 1]) + '\n'
 		for i in top[view] .. int_min(n, top[view] + page) {
+			index := visible[view][i]
 			mut line := ''
 			if view == 0 {
-				mut a := advs[visible[i]].clone()
+				mut a := advs[index].clone()
 				if a.len >= 5 && a[2] == '-' && cve_requested[a[0]] {
 					a[2] = 'requested*'
 				}
 				line = row(a, w)
 			} else if view == 1 {
-				line = crow(cms[i], advs, w)
+				line = crow(cms[index], advs, w)
 			} else {
-				line = irow(items[i], advs, w)
+				line = irow(items[index], advs, w)
 			}
 			out += if i == sel[view] { term.inverse(term.strip_ansi(line)) } else { line } + '\n'
 		}
 		if n == 0 {
-			out += term.dim(if view == 0 {
-				'No entries. Press f to change the filter or g to reload.'
+			out += term.dim(if queries[view] != '' {
+				'No matches. Press / to change or clear the text filter.'
+			} else if view == 0 {
+				'No entries. Press f/F to change the filter or g to reload.'
 			} else {
 				'No entries. Press g to reload or n to enter a commit/URL.'
 			}) + '\n'
@@ -584,10 +596,11 @@ fn tui(api GitHub, label string) {
 		} else {
 			'No advisory selected; n creates a draft from a commit, issue or PR'
 		}
-		out += '\x1b[${h - 2};1H' + hint#[..w - 1] + '\n'
+		filter_hint := if queries[view] == '' { hint } else { '/${queries[view]} | ${hint}' }
+		out += '\x1b[${h - 2};1H' + filter_hint#[..w - 1] + '\n'
 		out += key_hints(['m actions', 'b similar bugs', 'C credits', 's status', ...actions, 'g reload', 'A agent'], w - 1) + '\n'
-		out += key_hints(['? help', 'q quit', 'tab views', 'j/k/J/K move', 'enter view', 'e edit',
-			'r review', 'n new', 'f filter'], w - 1)
+		out += key_hints(['? help', 'q quit', 'tab views', '/ text', 'f/F state', 'j/k/J/K move',
+			'enter view', 'e edit', 'r review', 'n new'], w - 1)
 		print(out)
 		mut k := key(true)
 		mut show_input := input
@@ -625,16 +638,17 @@ fn tui(api GitHub, label string) {
 			'\t' {
 				// Jump to a linked entry in the next view when there is one.
 				next := (view + 1) % tabs.len
-				if next == 0 && ai >= 0 {
-					if ai !in visible {
+				if next == 0 && ai in advisory_matches {
+					if ai !in visible[0] {
 						filter = 0
-						sel[0] = ai
+						sel[0] = advisory_matches.index(ai)
 					} else {
-						sel[0] = visible.index(ai)
+						sel[0] = visible[0].index(ai)
 					}
-				} else if ai >= 0 {
+				} else if next != 0 && ai >= 0 {
 					entries := if next == 1 { cms } else { items }
-					for c, entry in entries {
+					for c, index in visible[next] {
+						entry := entries[index]
 						if entry.len >= 3 && adv_of([advs[ai]], entry[0]) == 0 {
 							sel[next] = c
 							break
@@ -643,9 +657,20 @@ fn tui(api GitHub, label string) {
 				}
 				view = next
 			}
-			'f' {
-				filter = (filter + 1) % states.len
+			'f', 'F' {
+				step := if k == 'f' { 1 } else { states.len - 1 }
+				filter = (filter + step) % states.len
 				sel[0], top[0] = 0, 0
+			}
+			'/' {
+				cooked()
+				println('Text filter: Enter applies, empty clears, Esc/Ctrl+C cancels.')
+				println('Current filter: ${queries[view]}')
+				if query := action_input('Filter text: ') {
+					queries[view] = query.trim_space()
+					sel[view], top[view] = 0, 0
+				}
+				raw()
 			}
 			'A' {
 				// cycle the agent; a custom GHAV_AI is replaced by the presets

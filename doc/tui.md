@@ -39,7 +39,8 @@ Keys:
 | `p` | publish |
 | `x` | close (asks `[y/N]`) |
 | `s` | show lifecycle, CVE, private-report status, timestamps and URL |
-| `f` | cycle all / triage / draft / published / closed |
+| `f` / `F` | cycle all / triage / draft / published / closed forward / backward, wrapping at either end |
+| `/` | enter a case-insensitive text filter for the current list; empty input clears it |
 | `A` | cycle the AI agent preset |
 | `g` | reload all lists |
 | `?` | show all keys and the active AI agent |
@@ -84,7 +85,14 @@ to refresh the assigned CVE; `s` displays the latest server details. Repeat requ
 suppressed for the rest of the session, and assigned IDs replace the marker on refresh.
 
 The state filter applies only to the advisory list; source links still use all advisories.
-Jumping to a linked advisory outside the current filter switches back to all.
+Press `/`, type a substring, and press Enter to filter by row data such as a title, CVE,
+commit hash, issue/PR number or linked advisory ID. An empty query clears the text filter;
+Escape or Ctrl+C cancels without changing it. Each tab retains its own query across tab
+switches and reloads. Advisory text and state filters combine. Applying either filter
+returns to the first matching row; the active text query appears above the shortcuts.
+
+Tab navigation selects linked entries only when they match the destination text filter.
+Jumping to a linked advisory outside the state filter switches its state filter back to all.
 
 ## Credits screen
 

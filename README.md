@@ -49,9 +49,10 @@ so V includes every source file.
 Run the focused source, advisory-link and review-diff tests with
 `v test ghadv_test.v workflow_test.v credits_test.v`. After building, run
 `python3 test/workflow.py /path/to/ghav` for recovery checks,
-`python3 test/credits.py /path/to/ghav` for the credits TUI and API checks, and
-`python3 test/similar.py /path/to/ghav` for similar-bug searches. These use stub
-commands and do not access GitHub or run an AI agent.
+`python3 test/credits.py /path/to/ghav` for the credits TUI and API checks,
+`python3 test/similar.py /path/to/ghav` for similar-bug searches, and
+`python3 test/filters.py /path/to/ghav` for state/text filters and filtered navigation.
+These use stub commands and do not access GitHub or run an AI agent.
 
 The source files share one V module:
 
@@ -94,9 +95,14 @@ ghav [-r owner/repo] [command] [args]
 
 Run `ghav` with no arguments for the TUI: advisory and fix-commit views, `tab` to
 switch, `m` for the selected advisory's actions, `c` to request a CVE, `s` for status,
-and `f` to filter by state. Two rows of colored shortcuts show navigation and the actions
-available for the selection; `?` shows all keys. Use `j`/`k` or the mouse wheel to
-move down/up one row in the active list.
+and `f`/`F` to cycle the state filter forward/backward. Two rows of colored shortcuts show
+navigation and the actions available for the selection; `?` shows all keys. Use `j`/`k`
+or the mouse wheel to move down/up one row in the active list.
+
+Press `/` to filter the current list by text, ignoring case. Enter applies the query;
+an empty query clears it, and Escape or Ctrl+C cancels. Each tab keeps its own text filter,
+which matches row data such as titles, IDs and linked advisories. Advisory text and state
+filters combine. The active query appears above the shortcuts.
 
 Press `r` to review the selected advisory. The optional extra-context prompt includes an
 example, such as "Check the affected versions and whether the fix addresses the root
