@@ -593,7 +593,7 @@ fn run(k string, repo string, id string, input string) ! {
 			os.write_file(path, text)!
 			if os.exists_in_system_path('r2') {
 				// The leading quote bypasses r2 command parsing for the filename.
-				os.system_args(['r2', '-q', '-c', "'cat -m ${path}", '--'])
+				os.system_args(['r2', '-q', '-c', "'cat -m ${path}~..", '--'])
 				os.input('press enter')
 			} else {
 				sh('${os.getenv_opt('PAGER') or { 'less' }} "\$1"', path)
