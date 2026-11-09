@@ -30,7 +30,7 @@ markdown description
 
 For `new`, the agent's notes are shown above the advisory as `#` comments.
 
-Credits can also be managed with `C` in the TUI or `ghav credits <ghsa>`, using a separate
+Credits can also be managed with `C` in the TUI or `ghadv credits <ghsa>`, using a separate
 screen with add/edit/delete controls and descriptions of all credit roles. See the
 [credits screen](tui.md#credits-screen). It updates only credits and leaves this editable
 format unchanged.
@@ -48,7 +48,7 @@ The diff (produced with `diff -U 99999`, labeled `advisory` and `review`) is app
 to the advisory and sent as a `PATCH`. Leaving the diff unchanged accepts all proposed
 changes; emptying the file or producing the original advisory aborts. If the AI proposes
 no changes, its notes are shown without opening the editor. Changes only to comments or
-formatting also abort without a save. After updating, `ghav` reloads the advisory and
+formatting also abort without a save. After updating, `ghadv` reloads the advisory and
 compares its editable fields before printing `Saved changes to <ghsa> on GitHub.`.
 If the reloaded fields differ or cannot be fetched, the error is shown and recovery
 files are kept. In the TUI, enter `v` at the following prompt to view the current version,
@@ -56,7 +56,7 @@ files are kept. In the TUI, enter `v` at the following prompt to view the curren
 
 ## Recovery
 
-Before the AI or editor starts, `ghav` prints a private recovery directory and a command
+Before the AI or editor starts, `ghadv` prints a private recovery directory and a command
 to resume it. If the AI fails or replies without an advisory, the error includes a preview
 of its captured reply and states that no changes were saved. Each attempt has its own
 directory. It contains:
@@ -82,7 +82,7 @@ If GitHub rejects the save, the error is shown and you can edit `result.md` or s
 editor or leaving a plain advisory unchanged still aborts without updating GitHub.
 An editor that exits with a nonzero status also aborts without uploading its buffer.
 
-Run `ghav resume <directory>` to continue without spending more AI tokens. It reopens the
+Run `ghadv resume <directory>` to continue without spending more AI tokens. It reopens the
 saved buffer and uses the saved repository and advisory ID, regardless of the current
 checkout. You can also inspect and repair the files first. Ctrl+C during the AI or a
 recovery prompt cancels the operation and returns to the list in the TUI. Standalone CLI

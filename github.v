@@ -106,7 +106,7 @@ fn (api GitHub) cve_request_path(id string) string {
 	configured_host := os.getenv('GH_HOST')
 	host := if configured_host != '' { configured_host } else { 'github.com' }
 	receipt := sha256.hexhash('${host}\n${api.repo}\n${id}'.to_lower())
-	return os.join_path(base, 'ghav', 'cve-requests', receipt)
+	return os.join_path(base, 'ghadv', 'cve-requests', receipt)
 }
 
 fn (api GitHub) cve_requested_at(id string) string {
@@ -129,9 +129,9 @@ fn (api GitHub) request_cve(id string) !string {
 	}
 	gh('api', '--method', 'POST', 'repos/${api.repo}/security-advisories/${id}/cve')!
 	api.save_cve_request(id) or {
-		return 'CVE request accepted, but could not save the local request receipt: ${err}. Check with ghav status ${id}'
+		return 'CVE request accepted, but could not save the local request receipt: ${err}. Check with ghadv status ${id}'
 	}
-	return 'CVE request accepted; assignment is asynchronous. Check with ghav status ${id}'
+	return 'CVE request accepted; assignment is asynchronous. Check with ghadv status ${id}'
 }
 
 // The issues endpoint includes pull requests. Closed items may still need a CVE.
@@ -160,7 +160,7 @@ fn (api GitHub) update_credits(id string, credits []Credit) ! {
 }
 
 fn send(method string, path string, payload string) !string {
-	f := os.join_path(os.temp_dir(), 'ghav-${os.getpid()}.json')
+	f := os.join_path(os.temp_dir(), 'ghadv-${os.getpid()}.json')
 	os.write_file(f, payload)!
 	defer {
 		os.rm(f) or {}

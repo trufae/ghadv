@@ -19,7 +19,7 @@ Commit circles use linked advisory severity or a keyword estimate from the subje
 States: triage (private report), draft, published, closed.
 CVE assignment is separate from the advisory state and happens asynchronously.
 Use s to check the assigned CVE; GitHub REST does not expose pending requests.
-requested* means ghav recorded an accepted request locally, across restarts.
+requested* means ghadv recorded an accepted request locally, across restarts.
 It is not a live queue status; s shows when the request was accepted.'
 
 fn color(state string, s string) string {
@@ -169,7 +169,7 @@ fn run(k string, api GitHub, id string, input string) ! {
 	match k {
 		'?' {
 			println(tui_help)
-			println('\nagent: ${os.getenv_opt('GHAV_AI') or { agents[0] }}')
+			println('\nagent: ${os.getenv_opt('GHADV_AI') or { agents[0] }}')
 			os.input('press enter')
 		}
 		's' {
@@ -249,7 +249,7 @@ fn advisory_tui(api GitHub, id string, first string) ! {
 }
 
 fn view_text(text string) ! {
-	path := os.join_path(os.temp_dir(), 'ghav-view-${os.getpid()}.md')
+	path := os.join_path(os.temp_dir(), 'ghadv-view-${os.getpid()}.md')
 	os.write_file(path, text)!
 	defer { os.rm(path) or {} }
 	if os.exists_in_system_path('r2') {
@@ -563,7 +563,7 @@ fn tui(api GitHub, label string) {
 		}
 		tabs := ['advisories ${visible[0].len} (${states[filter]})', 'commits ${visible[1].len}',
 			'issues/PRs ${visible[2].len} (${label})']
-		header := 'ghav ${api.repo} | ' + tabs.map(if it == tabs[view] { '[${it}]' } else { it }).join(' | ')
+		header := 'ghadv ${api.repo} | ' + tabs.map(if it == tabs[view] { '[${it}]' } else { it }).join(' | ')
 		columns := if view == 0 {
 			'   ${'ADVISORY':-20} ${'STATE':-10} ${'CVE':-15} ${'SEVERITY':-9} SUMMARY'
 		} else if view == 1 {
@@ -684,10 +684,10 @@ fn tui(api GitHub, label string) {
 				raw()
 			}
 			'A' {
-				// cycle the agent; a custom GHAV_AI is replaced by the presets
-				cur := agents.index(os.getenv_opt('GHAV_AI') or { agents[0] })
-				os.setenv('GHAV_AI', agents[(cur + 1) % agents.len], true)
-				status = 'agent: ${os.getenv('GHAV_AI')}'
+				// cycle the agent; a custom GHADV_AI is replaced by the presets
+				cur := agents.index(os.getenv_opt('GHADV_AI') or { agents[0] })
+				os.setenv('GHADV_AI', agents[(cur + 1) % agents.len], true)
+				status = 'agent: ${os.getenv('GHADV_AI')}'
 			}
 			'g' {
 				advs = api.advisories('') or { [['error:', err.msg()]] }

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the credits TUI in a pseudo-terminal with a stub gh; no GitHub writes.
 
-Usage: python3 test/credits.py /path/to/ghav
+Usage: python3 test/credits.py /path/to/ghadv
 """
 
 import fcntl
@@ -65,7 +65,7 @@ class Terminal:
             args, stdin=self.slave, stdout=self.slave, stderr=self.slave,
             env=os.environ | {'PATH': str(root) + os.pathsep + os.environ['PATH'],
                               'TEST_ROOT': str(root), 'TMPDIR': str(root),
-                              'GHAV_LABEL': '', 'TERM': 'xterm-256color'} | (extra_env or {}),
+                              'GHADV_LABEL': '', 'TERM': 'xterm-256color'} | (extra_env or {}),
             cwd=root, start_new_session=True,
             # Make typed Ctrl+C reach the foreground process group, as in a real terminal.
             preexec_fn=(lambda: fcntl.ioctl(0, termios.TIOCSCTTY, 0)) if controlling else None,
@@ -239,6 +239,6 @@ def checks(binary, root):
 
 if __name__ == '__main__':
     binary = str(Path(sys.argv[1]).resolve())
-    with tempfile.TemporaryDirectory(prefix='ghav-credits-test-') as tmp:
+    with tempfile.TemporaryDirectory(prefix='ghadv-credits-test-') as tmp:
         checks(binary, Path(tmp))
     print('Credits TUI and API checks passed')

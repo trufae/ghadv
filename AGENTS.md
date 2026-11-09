@@ -10,8 +10,8 @@ This is a small V CLI/TUI for managing GitHub repository security advisories.
 - `sources.v` parses commit/issue/PR inputs and discovers local fix commits.
 - `README.md` documents usage and includes design notes. Check the source for
   current behavior; design notes may describe ideas that are not implemented.
-- The documented CLI name is `ghav`; the Makefile defaults to `ghadv` and accepts
-  `BIN=ghav`. Configuration uses `GHAV_*` environment variables. Keep those
+- The CLI name and default Makefile binary are `ghadv`; `BIN` is overridable.
+  Configuration uses `GHADV_*` environment variables. Keep those
   interfaces stable unless a change is requested.
 
 ## Development
@@ -20,7 +20,7 @@ This is a small V CLI/TUI for managing GitHub repository security advisories.
   APIs and the existing helpers over new dependencies or abstractions.
 - Use `gh` for GitHub authentication and API requests. Pass arguments as arrays;
   reserve shell execution for intentionally configurable commands such as
-  `$EDITOR` and `GHAV_AI`.
+  `$EDITOR` and `GHADV_AI`.
 - Keep GitHub endpoints and payload handling in `github.v`; CLI, TUI and workflow
   code should call its repository-scoped methods.
 - Preserve the editable advisory format, abort behavior, and review workflow.
@@ -28,13 +28,13 @@ This is a small V CLI/TUI for managing GitHub repository security advisories.
 
 ## Validation
 
-Build the shared module with `v -o ghav .`. For a local smoke check without replacing the
+Build the shared module with `v -o ghadv .`. For a local smoke check without replacing the
 existing executable, build into a temporary directory and run help:
 
 ```sh
 build_dir=$(mktemp -d)
-v -o "$build_dir/ghav" .
-"$build_dir/ghav" --help
+v -o "$build_dir/ghadv" .
+"$build_dir/ghadv" --help
 ```
 
 Run the focused source parsing and linking tests with `v test ghadv_test.v`.

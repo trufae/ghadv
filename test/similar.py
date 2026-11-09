@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Similar-bug CLI/TUI checks with stub commands; no network or real AI calls.
 
-Usage: python3 test/similar.py /path/to/ghav
+Usage: python3 test/similar.py /path/to/ghadv
 """
 
 import json
@@ -81,7 +81,7 @@ def cli_checks(binary, root):
                       'https://github.com/owner/repo/pull/456']:
         # URL forms must infer the repository without consulting the current checkout.
         prefix = [] if selection.startswith('https://') else ['-r', 'owner/repo']
-        result, _ = run(binary, root, args=[*prefix, 'similar', selection], GHAV_REPO='')
+        result, _ = run(binary, root, args=[*prefix, 'similar', selection], GHADV_REPO='')
         assert result.returncode == 0, result.stdout
         prompt = last_prompt(root)
         if selection == UNLINKED:
@@ -125,7 +125,7 @@ def cli_checks(binary, root):
 
 
 def tui_checks(binary, root):
-    env = {'GHAV_AI': 'ai', 'EDITOR': 'editor'}
+    env = {'GHADV_AI': 'ai', 'EDITOR': 'editor'}
     with Terminal(binary, root, 'tui', env, controlling=True) as ui:
         ui.expect('b similar bugs')
         # Both the actions menu and the post-view advisory prompt expose the action.
@@ -208,7 +208,7 @@ def tui_checks(binary, root):
 
 if __name__ == '__main__':
     binary = str(Path(sys.argv[1]).resolve())
-    with tempfile.TemporaryDirectory(prefix='ghav-similar-test-') as tmp:
+    with tempfile.TemporaryDirectory(prefix='ghadv-similar-test-') as tmp:
         root = Path(tmp)
         setup(root)
         for name in ['gh', 'git']:

@@ -9,7 +9,7 @@ const agents = ['claude -p', 'codex exec -', 'pmai "\$(cat)"', 'opencode run "\$
 const reply = 'Reply with brief notes (verdict, confidence, doubts), then the advisory as the
 last thing in your reply, in exactly this format and without code fences:\n\n${format}'
 
-// runs a user configured shell command ($EDITOR, $GHAV_AI..) with $1.. bound to args
+// runs a user configured shell command ($EDITOR, $GHADV_AI..) with $1.. bound to args
 fn sh(cmd string, args ...string) int {
 	return os.system_args(['sh', '-c', cmd, 'sh', ...args])
 }
@@ -24,7 +24,7 @@ fn C._exit(int)
 
 // Keep each attempt separate, including repeated reviews of the same advisory.
 fn start_edit(api GitHub, id string, kind string, orig string, prompt string) !string {
-	dir := os.join_path(os.temp_dir(), 'ghav-${rand.ulid()}')
+	dir := os.join_path(os.temp_dir(), 'ghadv-${rand.ulid()}')
 	os.mkdir(dir, mode: 0o700)!
 	os.write_file(os.join_path(dir, 'session.json'), json2.encode(EditSession{api.repo, id, kind}))!
 	os.write_file(os.join_path(dir, 'original.md'), orig)!
@@ -34,7 +34,7 @@ fn start_edit(api GitHub, id string, kind string, orig string, prompt string) !s
 
 fn interrupt_edit(_ os.Signal) {
 	// The path is printed before starting any work. Avoid allocation in the handler.
-	os.fd_write(2, '\nInterrupted. Saved work is in the recovery directory printed above; use ghav resume to continue.\n')
+	os.fd_write(2, '\nInterrupted. Saved work is in the recovery directory printed above; use ghadv resume to continue.\n')
 	C._exit(130)
 }
 
@@ -45,7 +45,7 @@ fn resume_edit(dir string, run_ai bool) ! {
 		|| (session.kind != 'new' && session.id == '') {
 		return error('invalid recovery session: ${dir}')
 	}
-	println('Recovery files: ${dir}\nResume without AI: ghav resume ${os.quoted_path(dir)}')
+	println('Recovery files: ${dir}\nResume without AI: ghadv resume ${os.quoted_path(dir)}')
 	os.flush()
 	previous := os.signal_opt(.int, interrupt_edit)!
 	defer {
@@ -228,7 +228,7 @@ fn edit(dir string, orig string) ?Adv {
 fn ask_ai(dir string) ! {
 	pf := os.join_path(dir, 'prompt.txt')
 	of := os.join_path(dir, 'reply.txt')
-	ai := os.getenv_opt('GHAV_AI') or { agents[0] }
+	ai := os.getenv_opt('GHADV_AI') or { agents[0] }
 	println('running ${ai} ...')
 	code := sh('{ ${ai}\n} < "\$1" > "\$2"', pf, of)
 	if code != 0 {
@@ -257,7 +257,7 @@ fn ai_reply(out string) !(string, string) {
 
 // unified diff of the whole text, preceded by free text notes
 fn udiff(notes string, a string, b string) !string {
-	fa := os.join_path(os.temp_dir(), 'ghav-a-${os.getpid()}')
+	fa := os.join_path(os.temp_dir(), 'ghadv-a-${os.getpid()}')
 	fb := fa.replace('-a-', '-b-')
 	os.write_file(fa, a)!
 	os.write_file(fb, b)!

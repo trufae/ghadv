@@ -2,11 +2,11 @@ module main
 
 import os
 
-const help = 'Usage: ghav [-r owner/repo] [command] [args]
+const help = 'Usage: ghadv [-r owner/repo] [command] [args]
   tui [label]              advisory, commit and labeled issues/PRs tabs (default)
   ls [state]               list all/triage/draft/published/closed advisories
   log                      list ##crash/##security commits and their advisories
-  issues [label]           list labeled issues/PRs (default: GHAV_LABEL or cve)
+  issues [label]           list labeled issues/PRs (default: GHADV_LABEL or cve)
   new <commit|url> [context] analyze a commit, issue or PR with AI and create a draft
   show <ghsa>              print advisory
   status <ghsa>            show lifecycle, CVE and private report details
@@ -21,23 +21,23 @@ const help = 'Usage: ghav [-r owner/repo] [command] [args]
   publish <ghsa>           publish the advisory
   close <ghsa>             close (reject) the advisory
 Environment:
-  GHAV_REPO   default repository (otherwise taken from the cwd checkout)
-  GHAV_GREP   git log -E --grep for fix commits (default: ##(crash|security))
-  GHAV_LABEL  issues/PRs label (default: cve; includes open and closed items)
-  GHAV_AI     agent command, prompt is piped to stdin (default: claude -p)
-              e.g. "codex exec -", \'pmai "\$(cat)"\', \'opencode run "\$(cat)"\''
+  GHADV_REPO   default repository (otherwise taken from the cwd checkout)
+  GHADV_GREP   git log -E --grep for fix commits (default: ##(crash|security))
+  GHADV_LABEL  issues/PRs label (default: cve; includes open and closed items)
+  GHADV_AI     agent command, prompt is piped to stdin (default: claude -p)
+               e.g. "codex exec -", \'pmai "\$(cat)"\', \'opencode run "\$(cat)"\''
 
 fn issue_label(label string) string {
 	if label != '' {
 		return label
 	}
-	configured := os.getenv('GHAV_LABEL')
+	configured := os.getenv('GHADV_LABEL')
 	return if configured != '' { configured } else { 'cve' }
 }
 
 fn main() {
 	mut args := os.args[1..].clone()
-	mut repo := os.getenv('GHAV_REPO')
+	mut repo := os.getenv('GHADV_REPO')
 	if args.len > 1 && args[0] == '-r' {
 		repo = args[1]
 		args = args[2..].clone()
@@ -51,7 +51,7 @@ fn main() {
 	ctx := if args.len > 2 { args[2..].join(' ') } else { '' }
 	if cmd == 'resume' {
 		if id == '' {
-			eprintln('usage: ghav resume <recovery-directory>')
+			eprintln('usage: ghadv resume <recovery-directory>')
 			exit(1)
 		}
 		resume_edit(os.real_path(id), false) or {
@@ -69,7 +69,7 @@ fn main() {
 	}
 	if repo == '' {
 		repo = github_repository() or {
-			eprintln('cannot find repository, use -r owner/repo or GHAV_REPO')
+			eprintln('cannot find repository, use -r owner/repo or GHADV_REPO')
 			exit(1)
 		}
 	}

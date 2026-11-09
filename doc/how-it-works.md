@@ -1,6 +1,6 @@
 # How it works
 
-`ghav` is a thin wrapper around the GitHub REST API plus a couple of local edits, all done
+`ghadv` is a thin wrapper around the GitHub REST API plus a couple of local edits, all done
 through `gh api`.
 
 `ghadv.v` parses arguments and dispatches commands. The repository-scoped `GitHub`

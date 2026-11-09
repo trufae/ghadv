@@ -1,6 +1,6 @@
 # AI agent
 
-The agent is any command that reads the prompt on stdin. Set it with `GHAV_AI`.
+The agent is any command that reads the prompt on stdin. Set it with `GHADV_AI`.
 
 | Value | Notes |
 | --- | --- |
@@ -35,7 +35,7 @@ doubts), then the advisory as the last block of the reply, in the format from
 
 ## Finding similar bugs
 
-`b` in the TUI or `ghav similar <ghsa|commit|url> [context]` uses a dedicated search prompt.
+`b` in the TUI or `ghadv similar <ghsa|commit|url> [context]` uses a dedicated search prompt.
 It includes the selected advisory (with CVE and references) or source patch/report, any
 linked advisory, the existing advisory list for duplicate checking, and optional context.
 The agent verifies the checkout and revision, reconstructs the original root cause and
@@ -49,5 +49,5 @@ is a valid result. The prompt instructs the agent to preserve tracked files and 
 state and keep local reproduction work in an isolated temporary directory.
 
 The report opens in the usual Markdown viewer. Source evidence, prompt and raw reply
-remain in the private recovery directory, including after success. `ghav resume <directory>`
+remain in the private recovery directory, including after success. `ghadv resume <directory>`
 reopens the saved report without running the AI, parsing an advisory or submitting changes.

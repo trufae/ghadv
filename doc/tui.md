@@ -1,10 +1,10 @@
 # TUI
 
-Running `ghav` with no command opens the TUI.
+Running `ghadv` with no command opens the TUI.
 
 ```sh
 cd ~/radare2
-ghav
+ghadv
 ```
 
 Views, switched forward with `tab` and backward with `shift-tab`:
@@ -12,8 +12,8 @@ Views, switched forward with `tab` and backward with `shift-tab`:
 | View | Shows |
 | --- | --- |
 | advisories | GHSA id, state, CVE id, severity, summary |
-| commits | tagged fix commits (`GHAV_GREP`), date, subject, and the advisory referencing them |
-| issues/PRs | items with `GHAV_LABEL` (default `cve`, or `ghav tui <label>`), number, type, state, linked advisory and title |
+| commits | tagged fix commits (`GHADV_GREP`), date, subject, and the advisory referencing them |
+| issues/PRs | items with `GHADV_LABEL` (default `cve`, or `ghadv tui <label>`), number, type, state, linked advisory and title |
 
 The issues/PRs tab is always available and shows its label in the header. It includes every state, so
 closed issues and merged PRs remain available for reporting. `closed` in this list can
@@ -57,7 +57,7 @@ and callers." Enter starts; Escape or Ctrl+C cancels. The selected source and an
 advisory are sent to the configured AI, which searches the current checkout for related
 mistakes. The findings report opens in the Markdown viewer; it does not update an advisory.
 The source, prompt and reply remain in the printed recovery directory. Use
-`ghav resume <directory>` to reopen the report. See [the search prompt](ai-agent.md#finding-similar-bugs).
+`ghadv resume <directory>` to reopen the report. See [the search prompt](ai-agent.md#finding-similar-bugs).
 
 The `r` prompt accepts optional review instructions, for example: "Check the affected
 versions and whether the fix addresses the root cause." Press Enter to start, or Ctrl+C
@@ -65,7 +65,7 @@ or Escape to cancel without running the AI. The `n` input prompt accepts the sam
 keys. Ctrl+C while the AI is running or at a recovery prompt cancels that operation and
 returns to the list, keeping the recovery files printed before it started. An interrupted
 editor also returns to the list with terminal settings restored; unsaved editor buffers
-cannot be recovered by `ghav`.
+cannot be recovered by `ghadv`.
 
 After a review or edit, enter `v` to view the current advisory, `r` to review it again
 with new context, `b` to find similar bugs, or `e` to edit it. The same prompt appears after
@@ -96,7 +96,7 @@ Jumping to a linked advisory outside the state filter switches its state filter 
 
 ## Credits screen
 
-Press `C` in the list or actions menu, or run `ghav credits <ghsa>` directly. In the
+Press `C` in the list or actions menu, or run `ghadv credits <ghsa>` directly. In the
 commit and issue/PR views, this opens credits for the linked advisory. The screen lists
 each GitHub username and role, with an explanation of the selected role below the list.
 
@@ -151,5 +151,5 @@ instead of the terminal scrollback. It is disabled when opening a viewer, editor
 prompt in cooked mode, and when quitting.
 
 The header shows the repository, active view and advisory filter. Pressing `A`
-cycles through `claude -p`, `codex exec -` and `pmai "$(cat)"`; a custom `GHAV_AI` is
+cycles through `claude -p`, `codex exec -` and `pmai "$(cat)"`; a custom `GHADV_AI` is
 replaced by the first preset. The selected agent appears in the status line and `?` help.

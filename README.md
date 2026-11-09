@@ -1,4 +1,4 @@
-# ghav
+# ghadv
 
 Manage GitHub security advisories from the command line. Written in [V](https://vlang.io).
 
@@ -7,7 +7,7 @@ reconstruction, you keep the last word.
 
 ```sh
 $ cd ~/radare2
-$ ghav new 8f3a2c1 found by fuzzing the PDB parser
+$ ghadv new 8f3a2c1 found by fuzzing the PDB parser
 ```
 
 ## What it does
@@ -28,21 +28,21 @@ Requires [V](https://vlang.io), `git`, and an authenticated `gh` with
 **Repository security advisories: write** permission.
 
 ```sh
-git clone <this repo> && cd ghav
-make BIN=ghav install   # builds and installs ghav into ~/.local/bin
+git clone <this repo> && cd ghadv
+make BIN=ghadv install   # builds and installs ghadv into ~/.local/bin
 ```
 
-Or build only: `make` (defaults to `ghadv`), or `v -o ghav .`. `BIN`, `PREFIX` and
+Or build only: `make` (defaults to `ghadv`), or `v -o ghadv .`. `BIN`, `PREFIX` and
 `BINDIR` are overridable; `make uninstall` and `make clean` exist. Use the same `BIN`
 value for install, uninstall and clean.
 
 ## Usage
 
 ```sh
-ghav [-r owner/repo] [command] [args]
+ghadv [-r owner/repo] [command] [args]
 ```
 
-Run `ghav` with no arguments for the TUI (advisory, commit and labeled issues/PRs tabs).
+Run `ghadv` with no arguments for the TUI (advisory, commit and labeled issues/PRs tabs).
 Use `Tab` to cycle tabs forward and `Shift-Tab` to cycle backward, wrapping at either end.
 Key commands:
 
@@ -63,7 +63,7 @@ Key commands:
 | `cve <ghsa>` | request a CVE id |
 | `draft/publish/close <ghsa>` | change state |
 
-Configuration lives in `GHAV_REPO`, `GHAV_LABEL`, `GHAV_AI`, `GHAV_GREP`, plus `$EDITOR`
+Configuration lives in `GHADV_REPO`, `GHADV_LABEL`, `GHADV_AI`, `GHADV_GREP`, plus `$EDITOR`
 and `$PAGER`. See [doc/configuration.md](doc/configuration.md).
 
 ## Documentation
@@ -74,7 +74,7 @@ and `$PAGER`. See [doc/configuration.md](doc/configuration.md).
 | [doc/tui.md](doc/tui.md) | views and all keybindings |
 | [doc/advisory-format.md](doc/advisory-format.md) | the text format and the review diff rules |
 | [doc/ai-agent.md](doc/ai-agent.md) | how the agent is prompted and what it checks |
-| [doc/configuration.md](doc/configuration.md) | `GHAV_*`, `EDITOR`, `PAGER`, permissions |
+| [doc/configuration.md](doc/configuration.md) | `GHADV_*`, `EDITOR`, `PAGER`, permissions |
 | [doc/how-it-works.md](doc/how-it-works.md) | API endpoints and commit linking |
 | [doc/design-notes.md](doc/design-notes.md) | why it works this way, and limitations |
 

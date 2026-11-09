@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exercise TUI filtering and selection with stub gh/git commands.
 
-Usage: python3 test/filters.py /path/to/ghav
+Usage: python3 test/filters.py /path/to/ghadv
 """
 
 import json
@@ -70,7 +70,7 @@ def checks(binary, root):
     (root / 'issues').write_text(''.join(
         f'https://github.com/owner/repo/issues/{i}\t{i}\tissue\topen\t{title} report\n'
         for i, (_, _, title) in enumerate(rows, 1)))
-    with Terminal(binary, root, 'tui', {'GHAV_LABEL': 'security'}) as ui:
+    with Terminal(binary, root, 'tui', {'GHADV_LABEL': 'security'}) as ui:
         ui.expect('advisories 4 (all)')
         for key, states in [('F', ['closed', 'published', 'draft', 'triage', 'all']),
                             ('f', ['triage', 'draft', 'published', 'closed', 'all'])]:
@@ -157,6 +157,6 @@ def checks(binary, root):
 
 if __name__ == '__main__':
     binary = str(Path(sys.argv[1]).resolve())
-    with tempfile.TemporaryDirectory(prefix='ghav-filter-test-') as tmp:
+    with tempfile.TemporaryDirectory(prefix='ghadv-filter-test-') as tmp:
         checks(binary, Path(tmp))
     print('TUI filter checks passed')
