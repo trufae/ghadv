@@ -32,6 +32,10 @@ doubts), then the advisory as the last block of the reply, in the format from
 - first affected and first fixed release — never assume every release before the fix is
   vulnerable; check tags and backports
 - duplicates; one commit may fix several bugs, several commits may share one root cause
+- original finder/reporter attribution from commit messages and linked reports: verified
+  GitHub logins go in credits; names, handles and scan references (such as OSS-SCAN and
+  scan-coverity with their full IDs) not captured there go in the advisory description
+  under Acknowledgements, preserving source links rather than appearing only in agent notes
 
 ## Finding similar bugs
 

@@ -346,6 +346,12 @@ Do not assume every older release is affected: find when the vulnerable code was
 If the commit fixes several independent vulnerabilities, describe the most important one and
 list the others in your notes. Flag duplicates of the existing advisories listed below.
 Include ${s.url} and any verified fix commits in the references.
+Preserve attribution to the original finders and reporters from commit messages and linked reports,
+including names, usernames and scan references such as OSS-SCAN and scan-coverity with their full IDs.
+Use the credits field for verified GitHub logins with the appropriate finder, reporter or tool role.
+Any attribution not captured in credits must appear in an Acknowledgements section in the advisory
+description, not just your notes; preserve the original names, handles, full scan IDs and source links.
+Do not invent GitHub usernames from scan IDs or assume the fix author discovered the vulnerability.
 
 ${reply}
 

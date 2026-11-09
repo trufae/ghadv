@@ -15,6 +15,7 @@ $ ghadv new 8f3a2c1 found by fuzzing the PDB parser
 - Lists advisories, local fix commits, and labeled issues/PRs.
 - Drafts an advisory from a commit or GitHub issue/PR URL: the agent reads the report,
   discussion, patch, history and tags, then writes root cause, CWE, CVSS and versions.
+  Finder/reporter attribution and scan IDs are preserved in credits or the advisory text.
 - Reviews existing advisories with the agent as a diff you accept or reject line by line.
 - Finds similar bugs using an advisory, CVE or fix commit as a template for an AI search.
 - Manages credits (finders, reporters, fix authors, ...) in a TUI screen.
