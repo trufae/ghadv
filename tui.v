@@ -3,7 +3,8 @@ module main
 import os
 import term
 
-const tui_help = 'tab: switch advisories/commits/issues; j/k or mouse wheel: move; J/K: move ten rows
+const tui_help = 'tab/shift-tab: next/previous view (advisories/commits/issues)
+j/k or mouse wheel: move; J/K: move ten rows
 enter: view advisory/commit/issue/PR; e: edit; r: AI review; n: new draft
 b: find similar bugs using the selected advisory or source as a template
 C: manage advisory credits (finder, reporter, fix developer and other roles)
@@ -608,7 +609,7 @@ fn tui(api GitHub, label string) {
 		filter_hint := if queries[view] == '' { hint } else { '/${queries[view]} | ${hint}' }
 		out += '\x1b[${h - 2};1H' + filter_hint#[..w - 1] + '\n'
 		out += key_hints(['m actions', 'b similar bugs', 'C credits', 's status', ...actions, 'g reload', 'A agent'], w - 1) + '\n'
-		out += key_hints(['? help', 'q quit', 'tab views', '/ text', 'f/F state', 'j/k/J/K move',
+		out += key_hints(['? help', 'q quit', 'tab/shift-tab views', '/ text', 'f/F state', 'j/k/J/K move',
 			'enter view', 'e edit', 'r review', 'n new'], w - 1)
 		print(out)
 		mut k := key(true)
@@ -644,9 +645,10 @@ fn tui(api GitHub, label string) {
 			'k', '\x1b[A', 'K' {
 				sel[view] -= if k == 'K' { 10 } else { 1 }
 			}
-			'\t' {
-				// Jump to a linked entry in the next view when there is one.
-				next := (view + 1) % tabs.len
+			'\t', '\x1b[Z' {
+				// Jump to a linked entry in the destination view when there is one.
+				step := if k == '\t' { 1 } else { tabs.len - 1 }
+				next := (view + step) % tabs.len
 				if next == 0 && ai in advisory_matches {
 					if ai !in visible[0] {
 						filter = 0

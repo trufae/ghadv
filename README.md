@@ -43,6 +43,7 @@ ghav [-r owner/repo] [command] [args]
 ```
 
 Run `ghav` with no arguments for the TUI (advisory, commit and labeled issues/PRs tabs).
+Use `Tab` to cycle tabs forward and `Shift-Tab` to cycle backward, wrapping at either end.
 Key commands:
 
 | Command | What |

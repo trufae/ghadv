@@ -7,7 +7,7 @@ cd ~/radare2
 ghav
 ```
 
-Views, switched with `tab`:
+Views, switched forward with `tab` and backward with `shift-tab`:
 
 | View | Shows |
 | --- | --- |
@@ -26,7 +26,7 @@ Keys:
 | `j` / `k` | move one row |
 | mouse wheel down / up | move one row, like `j` / `k` |
 | `J` / `K` | move ten rows |
-| `tab` | cycle views, selecting a linked entry in the next view when one exists |
+| `tab` / `shift-tab` | cycle views forward / backward, wrapping at either end and selecting a linked entry in the destination view when one exists |
 | `enter` | show the commit (`git show`), advisory or issue/PR discussion (`r2` Markdown rendering if available, otherwise `$PAGER`) |
 | `n` | draft from the selected commit or issue/PR; in the advisory view, prompt for a commit or URL and optional context |
 | `e` | edit the linked advisory |
