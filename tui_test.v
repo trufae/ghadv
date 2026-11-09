@@ -42,7 +42,8 @@ fn test_rows_fit_every_width() {
 
 fn test_small_layouts_and_scroll_limits() {
 	for h in 1 .. 60 {
-		for headers, footers in {2: 3, 3: 4, 1: 1} {
+		for dimensions in [[2, 3], [3, 3], [3, 4], [1, 1]] {
+			headers, footers := dimensions[0], dimensions[1]
 			layout := tui_layout(h, headers, footers)
 			assert layout.page >= 1
 			assert layout.head + layout.page + layout.foot == h
@@ -64,6 +65,21 @@ fn test_small_layouts_and_scroll_limits() {
 	assert list_top(99, 99, 100, 10) == 90
 	assert list_top(90, 0, 100, 10) == 0
 	assert list_top(90, 99, 100, 200) == 0
+}
+
+fn test_tabs_keep_all_views_until_the_compact_row_no_longer_fits() {
+	tabs := ['advisories 12 (all)', 'commits 34', 'issues/PRs 5 (cve)']
+	assert tui_tabs(tabs, 0, 90) == '[advisories 12 (all)] | commits 34 | issues/PRs 5 (cve)'
+	assert tui_tabs(tabs, 1, 40) == 'advisories | [commits] | issues/PRs'
+	assert tui_tabs(tabs, 2, 40) == 'advisories | commits | [issues/PRs]'
+	assert tui_tabs(tabs, 1, 20) == '[commits 34]'
+	for view in 0 .. tabs.len {
+		for width in 1 .. 100 {
+			line := tui_tabs(tabs, view, width)
+			assert clip_line(line, width) == line
+			if width >= 20 { assert line.contains('[' + tabs[view].all_before(' ')) }
+		}
+	}
 }
 
 fn test_render_updates_only_changed_rows_without_scrolling() {

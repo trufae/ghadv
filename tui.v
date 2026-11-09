@@ -101,6 +101,14 @@ fn list_frame(layout TuiLayout, headers []string, body []string, footers []strin
 	return lines
 }
 
+fn tui_tabs(tabs []string, view int, width int) string {
+	for labels in [tabs, tabs.map(it.all_before(' '))] {
+		line := labels.map(if it == labels[view] { '[${it}]' } else { it }).join(' | ')
+		if clip_line(line, width) == line { return line }
+	}
+	return clip_line('[${tabs[view]}]', width)
+}
+
 struct TuiScreen {
 mut:
 	lines []string
@@ -725,6 +733,7 @@ fn tui(api GitHub, label string) {
 	mut advs := api.advisories('') or { [['error:', err.msg()]] }
 	mut cms := commits() or { [['error:', err.msg()]] }
 	mut items := api.issues(label) or { [['error:', err.msg()]] }
+	mut git_status := local_git_status()
 	mut view := 0 // 0 advisories, 1 git, 2 labeled issues/PRs
 	mut sel := [0, 0, 0]
 	mut top := [0, 0, 0]
@@ -736,7 +745,7 @@ fn tui(api GitHub, label string) {
 	for {
 		w, h := terminal_size()
 		width := line_width(w)
-		layout := tui_layout(h, 2, 3)
+		layout := tui_layout(h, 3, 3)
 		mut visible := [][]int{len: 3}
 		for v, entries in [advs, cms, items] {
 			query := queries[v].to_lower()
@@ -778,8 +787,8 @@ fn tui(api GitHub, label string) {
 		}
 		tabs := ['advisories ${visible[0].len} (${states[filter]})', 'commits ${visible[1].len}',
 			'issues/PRs ${visible[2].len} (${label})']
-		full_header := 'ghadv ${api.repo} | ' + tabs.map(if it == tabs[view] { '[${it}]' } else { it }).join(' | ')
-		header := if term.printable_len(full_header) <= width { full_header } else { '[${tabs[view]}] | ${api.repo}' }
+		header := 'ghadv ${api.repo} | local git: ${git_status}'
+		tab_line := tui_tabs(tabs, view, width)
 		columns := if w < 40 {
 			if view == 0 { 'SUMMARY' } else if view == 1 { 'SUBJECT' } else { 'NUMBER TITLE' }
 		} else if w < 80 {
@@ -826,7 +835,10 @@ fn tui(api GitHub, label string) {
 			'No advisory selected; n creates a draft from a commit, issue or PR'
 		}
 		filter_hint := if queries[view] == '' { hint } else { '/${queries[view]} | ${hint}' }
-		screen.draw(list_frame(layout, [term.bold(header), term.dim(columns)], body, [filter_hint,
+		mut headers := [term.bold(header), term.bold(tab_line), term.dim(columns)]
+		// Keep the active view visible when a short terminal only has one header.
+		if layout.head == 1 { headers[0] = headers[1] }
+		screen.draw(list_frame(layout, headers, body, [filter_hint,
 			key_hints(['m actions', 'b similar bugs', 'C credits', 's status', ...actions, 'g reload', 'A agent'], width),
 			key_hints(['? help', 'q quit', 'tab/shift-tab views', '/ text', 'f/F state', 'j/k/J/K move',
 			'enter view', 'e edit', 'r review', 'n new'], width)]), w, h)
@@ -905,6 +917,7 @@ fn tui(api GitHub, label string) {
 				advs = api.advisories('') or { [['error:', err.msg()]] }
 				cms = commits() or { [['error:', err.msg()]] }
 				items = api.issues(label) or { [['error:', err.msg()]] }
+				git_status = local_git_status()
 			}
 			'\n', '\r', 'e', 'r', 'b', 'n', 's', 'C', '?' {
 				if id == '' && (k in ['e', 'r', 's', 'C'] || (k in ['\n', '\r', 'b'] && input == '')) {
@@ -931,6 +944,7 @@ fn tui(api GitHub, label string) {
 				}
 				raw()
 				advs = api.advisories('') or { advs }
+				git_status = local_git_status()
 			}
 			'a', 'c', 'd', 'p', 'x' {
 				if id == '' {

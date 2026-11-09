@@ -42,7 +42,7 @@ Keys:
 | `f` / `F` | cycle all / triage / draft / published / closed forward / backward, wrapping at either end |
 | `/` | enter a case-insensitive text filter for the current list; empty input clears it |
 | `A` | cycle the AI agent preset |
-| `g` | reload all lists |
+| `g` | reload all lists and local Git status |
 | `?` | show all keys and the active AI agent |
 | `q` / `Ctrl+C` | quit from the main list |
 
@@ -167,6 +167,14 @@ Mouse reporting is enabled while the TUI is active, so the wheel moves the selec
 instead of the terminal scrollback. It is disabled when opening a viewer, editor or
 text input prompt, and when quitting.
 
-The header shows the repository, active view and advisory filter. Pressing `A`
+The first row shows the repository and local Git status: the latest commit hash,
+clean, unstaged, staged, untracked or conflicted indicators, then the commit subject.
+The status refers to the current checkout, even when `-r` selects another GitHub repository;
+it shows `unavailable` outside a working tree and `HEAD unavailable` when no commit can be read.
+It refreshes with `g` and after returning from a viewer, editor or AI workflow.
+Tabs occupy the second row, with the active view in brackets and the advisory state filter
+and issue label shown when space permits. Narrow windows omit counts and filters before
+falling back to the active tab; short windows prioritize the tab row over repository details.
+Pressing `A`
 cycles through `claude -p`, `codex exec -` and `pmai "$(cat)"`; a custom `GHADV_AI` is
 replaced by the first preset. The selected agent appears in the status line and `?` help.

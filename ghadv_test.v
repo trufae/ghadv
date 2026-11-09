@@ -3,6 +3,21 @@ module main
 import term
 import encoding.utf8.east_asian
 
+fn test_git_change_indicators() {
+	assert git_changes('') == 'clean'
+	assert git_changes(' M tracked\x00') == 'unstaged'
+	assert git_changes('M  tracked\x00') == 'staged'
+	assert git_changes('MM tracked\x00?? new file\x00') == 'unstaged, staged, untracked'
+	assert git_changes(' D deleted\x00') == 'unstaged'
+	assert git_changes('A  added\x00') == 'staged'
+	assert git_changes('UU conflict\x00') == 'conflicts'
+	assert git_changes('!! ignored\x00') == 'clean'
+	// The old path of a rename is not a second status record.
+	assert git_changes('R  new name\x00?? old name\x00') == 'staged'
+	assert git_changes('RM renamed\x00UU old\x00?? new\n M filename\x00') == 'unstaged, staged, untracked'
+	assert git_changes(' M tracked\n?? filename\x00') == 'unstaged'
+}
+
 fn test_commit_severity_from_crash_subjects() {
 	cases := {
 		'Fix null deref crash when parsing unnamed pdb globals ##crash': 'low'

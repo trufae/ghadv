@@ -52,6 +52,47 @@ fn commits() ![][]string {
 	return r.output.split_into_lines().filter(it != '').map(it.split('\t'))
 }
 
+// Porcelain -z keeps filenames opaque, including newlines and rename sources.
+fn git_changes(porcelain string) string {
+	mut staged, unstaged, untracked, conflicted := false, false, false, false
+	mut rename_source := false
+	for entry in porcelain.split('\x00') {
+		if rename_source {
+			rename_source = false
+			continue
+		}
+		if entry.len < 3 { continue }
+		xy := entry[..2]
+		if xy == '??' {
+			untracked = true
+		} else if xy in ['DD', 'AU', 'UD', 'UA', 'DU', 'AA', 'UU'] {
+			conflicted = true
+		} else if xy != '!!' {
+			staged = staged || entry[0] != ` `
+			unstaged = unstaged || entry[1] != ` `
+			rename_source = entry[0] in [`R`, `C`] || entry[1] in [`R`, `C`]
+		}
+	}
+	mut changes := []string{}
+	if conflicted { changes << 'conflicts' }
+	if unstaged { changes << 'unstaged' }
+	if staged { changes << 'staged' }
+	if untracked { changes << 'untracked' }
+	return if changes.len == 0 { 'clean' } else { changes.join(', ') }
+}
+
+// This describes the cwd checkout, which may differ from an explicit -r repo.
+fn local_git_status() string {
+	status := os.exec(['git', '--no-optional-locks', 'status', '--porcelain=v1', '-z',
+		'--untracked-files=normal', '--ignore-submodules=none'])
+	if status.exit_code != 0 { return 'unavailable' }
+	changes := git_changes(status.output)
+	latest := os.exec(['git', 'log', '-1', '--format=%h%x09%s', '--no-show-signature'])
+	if latest.exit_code != 0 { return 'HEAD unavailable | ${changes}' }
+	parts := latest.output.trim_space().split('\t')
+	return '${parts[0]} | ${changes}' + if parts.len > 1 { ' | ' + parts[1..].join(' ') } else { '' }
+}
+
 // Rough display-only ratings from radare2 ##crash subjects, strongest match first.
 fn commit_severity(subject string) string {
 	message := subject.to_lower().replace('##crash', '').replace('##security', '')
