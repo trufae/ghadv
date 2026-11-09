@@ -51,7 +51,8 @@ Run the focused source, advisory-link and review-diff tests with
 `python3 test/workflow.py /path/to/ghav` for recovery checks,
 `python3 test/credits.py /path/to/ghav` for the credits TUI and API checks,
 `python3 test/similar.py /path/to/ghav` for similar-bug searches, and
-`python3 test/filters.py /path/to/ghav` for state/text filters and filtered navigation.
+`python3 test/filters.py /path/to/ghav` for state/text filters and filtered navigation,
+and `python3 test/cve.py /path/to/ghav` for CVE request persistence and status.
 These use stub commands and do not access GitHub or run an AI agent.
 
 The source files share one V module:
@@ -190,8 +191,18 @@ ghav -r owner/repo cve GHSA-xxxx-yyyy-zzzz
 ghav -r owner/repo status GHSA-xxxx-yyyy-zzzz
 ```
 
-In the TUI, `requested*` records a CVE request accepted during this session. Reload with
-`g` to check for the assigned ID; GitHub REST does not expose a pending-request status.
+In the TUI and `ls`, `requested*` means GitHub accepted a request made through `ghav`.
+The receipt survives restarts; `status` (or `s`) shows its acceptance time. Reload with
+`g` to check for the assigned ID, which takes precedence over the receipt.
+Receipts are stored per GitHub host, repository and advisory under
+`${XDG_STATE_HOME:-$HOME/.local/state}/ghav/cve-requests/`.
+
+This is a local record, not live queue progress: GitHub's documented
+[REST](https://docs.github.com/en/rest/security-advisories/repository-advisories) and
+[GraphQL](https://docs.github.com/en/graphql/reference/security-advisories) APIs do not
+expose a pending-request status. Requests made elsewhere or before receipt tracking
+cannot be recovered automatically; an unassigned CVE without a receipt has unknown
+request status. To explicitly retry a request, use `ghav cve <ghsa>`.
 
 Press `enter` on an advisory to render its Markdown with `r2 -q -c "cat -m file.md" --`
 when `r2` is on `PATH`. Otherwise it opens in `$PAGER` (default: `less`). After closing

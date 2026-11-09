@@ -18,7 +18,8 @@ Commit circles use linked advisory severity or a keyword estimate from the subje
 States: triage (private report), draft, published, closed.
 CVE assignment is separate from the advisory state and happens asynchronously.
 Use s to check the assigned CVE; GitHub REST does not expose pending requests.
-requested* means a request was accepted during this TUI session.'
+requested* means ghav recorded an accepted request locally, across restarts.
+It is not a live queue status; s shows when the request was accepted.'
 
 fn color(state string, s string) string {
 	return if !term.can_show_color_on_stdout() {
@@ -74,12 +75,12 @@ fn row(r []string, w int) string {
 }
 
 // Suggested actions depend on the advisory lifecycle, independently of CVE assignment.
-fn advisory_actions(a []string, requested bool) []string {
+fn advisory_actions(a []string) []string {
 	if a.len < 5 {
 		return []string{}
 	}
 	mut actions := []string{}
-	if a[1] in ['draft', 'published'] && a[2] == '-' && !requested {
+	if a[1] in ['draft', 'published'] && a[2] == '-' {
 		actions << 'c request CVE'
 	}
 	if a[1] == 'triage' {
@@ -514,7 +515,6 @@ fn tui(api GitHub, label string) {
 	mut status := ''
 	mut filter := 0
 	mut queries := ['', '', '']
-	mut cve_requested := map[string]bool{}
 	raw()
 	for {
 		mut w, mut h := term.get_terminal_size()
@@ -556,7 +556,7 @@ fn tui(api GitHub, label string) {
 		}
 		id := if ai >= 0 && ai < advs.len && advs[ai].len >= 5 { advs[ai][0] } else { '' }
 		actions := if id != '' {
-			advisory_actions(advs[ai], cve_requested[id])
+			advisory_actions(advs[ai])
 		} else {
 			[]string{}
 		}
@@ -576,11 +576,7 @@ fn tui(api GitHub, label string) {
 			index := visible[view][i]
 			mut line := ''
 			if view == 0 {
-				mut a := advs[index].clone()
-				if a.len >= 5 && a[2] == '-' && cve_requested[a[0]] {
-					a[2] = 'requested*'
-				}
-				line = row(a, w)
+				line = row(advs[index], w)
 			} else if view == 1 {
 				line = crow(cms[index], advs, w)
 			} else {
@@ -600,12 +596,10 @@ fn tui(api GitHub, label string) {
 		hint := if status != '' {
 			status
 		} else if id != '' {
-			cve := if advs[ai][2] != '-' {
-				advs[ai][2]
-			} else if cve_requested[id] {
-				'CVE requested this session; g reload'
-			} else {
-				'no CVE assigned'
+			cve := match advs[ai][2] {
+				'requested*' { 'CVE request recorded locally; g reload, s status' }
+				'-' { 'no CVE assigned; request status unknown' }
+				else { advs[ai][2] }
 			}
 			'${id} | ${advs[ai][1]} | ${cve}'
 		} else {
@@ -722,10 +716,10 @@ fn tui(api GitHub, label string) {
 				}
 				action_key := if k == 'a' { 'c' } else { k }
 				if !actions.any(it.starts_with(action_key + ' ')) {
-					status = if action_key == 'c' && advs[ai][2] != '-' {
+					status = if action_key == 'c' && advs[ai][2] == 'requested*' {
+						'CVE request already recorded locally; g reload, s status'
+					} else if action_key == 'c' && advs[ai][2] != '-' {
 						'CVE already assigned: ${advs[ai][2]}'
-					} else if action_key == 'c' && cve_requested[id] {
-						'CVE request already accepted this session; g reload, s status'
 					} else {
 						'action unavailable for ${advs[ai][1]}; press m for actions'
 					}
@@ -740,8 +734,9 @@ fn tui(api GitHub, label string) {
 				print('\x1b[${h - 1};1H\x1b[2K${verb} ${id}? [y/N] ')
 				if key(false) == 'y' {
 					status = act(k, api, id) or { 'error: ' + err.msg().replace('\n', ' ') }
-					if status.starts_with('CVE request accepted') {
-						cve_requested[id] = true
+					if status.starts_with('CVE request accepted;') {
+						// Keep the accepted request visible even if the reload fails.
+						advs[ai][2] = 'requested*'
 						status = 'CVE request accepted; assignment is asynchronous. g reload, s status'
 					}
 					advs = api.advisories('') or { advs }

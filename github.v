@@ -3,6 +3,8 @@ module main
 import os
 import json2
 import net.urllib
+import crypto.sha256
+import time
 
 // Repository-scoped GitHub API. All requests use the authenticated gh CLI.
 struct GitHub {
@@ -27,7 +29,7 @@ patched: \\(.patched_versions // "")
 
 const jq_status = '"advisory: \\(.ghsa_id)
 state: \\(.state)
-cve: \\(.cve_id // "unassigned (request status unavailable via REST)")
+cve: \\(.cve_id // "unassigned")
 private report: \\(if .submission == null then "no" elif .submission.accepted then "accepted" else "not accepted" end)
 created: \\(.created_at // "-")
 updated: \\(.updated_at // "-")
@@ -76,11 +78,48 @@ fn (api GitHub) advisories(state string) ![][]string {
 	}
 	query := if state in ['', 'all'] { '' } else { '?state=${state}' }
 	out := gh('api', '--paginate', 'repos/${api.repo}/security-advisories${query}', '--jq', '.[] | [.ghsa_id, .state, .cve_id // "-", .severity // "-", .summary, ([.description // "" | scan("[0-9a-f]{10,40}")] | join(",")), ([.description // "" | scan("https://github[.]com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/(?:issues|pull)/[0-9]+")] | join(","))] | @tsv')!
-	return out.split_into_lines().filter(it != '').map(it.split('\t'))
+	mut rows := out.split_into_lines().filter(it != '').map(it.split('\t'))
+	for mut row in rows {
+		if row.len >= 5 && row[2] == '-' && api.cve_requested_at(row[0]) != '' {
+			row[2] = 'requested*'
+		}
+	}
+	return rows
 }
 
 fn (api GitHub) status(id string) !string {
-	return gh('api', 'repos/${api.repo}/security-advisories/${id}', '--jq', jq_status)
+	text := gh('api', 'repos/${api.repo}/security-advisories/${id}', '--jq', jq_status)!
+	requested_at := api.cve_requested_at(id)
+	cve := if requested_at != '' {
+		'requested* (no CVE assigned)\nrequest accepted: ${requested_at} (recorded locally; current GitHub request status unavailable)'
+	} else {
+		'unassigned (request status unknown; GitHub REST does not expose it)'
+	}
+	return text.replace_once('\ncve: unassigned\n', '\ncve: ${cve}\n')
+}
+
+// GitHub exposes assigned IDs, but no pending-request status. Keep a receipt of
+// successful requests, shared by the CLI and TUI, without treating it as live status.
+fn (api GitHub) cve_request_path(id string) string {
+	configured := os.getenv('XDG_STATE_HOME')
+	base := if configured != '' { configured } else { os.join_path(os.home_dir(), '.local', 'state') }
+	configured_host := os.getenv('GH_HOST')
+	host := if configured_host != '' { configured_host } else { 'github.com' }
+	receipt := sha256.hexhash('${host}\n${api.repo}\n${id}'.to_lower())
+	return os.join_path(base, 'ghav', 'cve-requests', receipt)
+}
+
+fn (api GitHub) cve_requested_at(id string) string {
+	text := os.read_file(api.cve_request_path(id)) or { return '' }
+	stamp := text.trim_space()
+	time.parse_rfc3339(stamp) or { return '' }
+	return stamp
+}
+
+fn (api GitHub) save_cve_request(id string) ! {
+	path := api.cve_request_path(id)
+	os.mkdir_all(os.dir(path), mode: 0o700)!
+	os.write_file(path, time.utc().format_rfc3339() + '\n')!
 }
 
 fn (api GitHub) request_cve(id string) !string {
@@ -89,6 +128,9 @@ fn (api GitHub) request_cve(id string) !string {
 		return 'CVE already assigned: ${cve}'
 	}
 	gh('api', '--method', 'POST', 'repos/${api.repo}/security-advisories/${id}/cve')!
+	api.save_cve_request(id) or {
+		return 'CVE request accepted, but could not save the local request receipt: ${err}. Check with ghav status ${id}'
+	}
 	return 'CVE request accepted; assignment is asynchronous. Check with ghav status ${id}'
 }
 
