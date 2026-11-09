@@ -42,12 +42,20 @@ Keys:
 | `A` | cycle the AI agent preset |
 | `g` | reload all lists |
 | `?` | show all keys and the active AI agent |
-| `q` | quit |
+| `q` / `Ctrl+C` | quit from the main list |
 
 In the commit and issues/PRs views, advisory actions act on the advisory that references
 the selected item. If there is none, press `n` to prepare a draft, review it in `$EDITOR`,
 then `c` to request a CVE. Issue/PR links require their full URL in the advisory description.
 Creating a draft does not request a CVE, publish, or remove the label.
+
+The `r` prompt accepts optional review instructions, for example: "Check the affected
+versions and whether the fix addresses the root cause." Press Enter to start, or Ctrl+C
+or Escape to cancel without running the AI. The `n` input prompt accepts the same cancel
+keys. Ctrl+C while the AI is running or at a recovery prompt cancels that operation and
+returns to the list, keeping the recovery files printed before it started. An interrupted
+editor also returns to the list with terminal settings restored; unsaved editor buffers
+cannot be recovered by `ghav`.
 
 The bottom two rows separate colored keys from descriptions. The action row and `m` menu
 offer actions appropriate to the selected advisory's state and CVE assignment. The status

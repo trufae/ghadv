@@ -75,8 +75,9 @@ An editor that exits with a nonzero status also aborts without uploading its buf
 
 Run `ghav resume <directory>` to continue without spending more AI tokens. It reopens the
 saved buffer and uses the saved repository and advisory ID, regardless of the current
-checkout. You can also inspect and repair the files first. Ctrl+C exits the workflow with
-status 130 and keeps files already written, including partial agent output; it cannot
+checkout. You can also inspect and repair the files first. Ctrl+C during the AI or a
+recovery prompt cancels the operation and returns to the list in the TUI. Standalone CLI
+workflows exit with status 130. Both keep files already written, including partial agent output; they cannot
 save an editor's unsaved buffer or output the agent has not emitted. If interrupted before
 the advisory was extracted, repair `reply.txt` if needed, then resume.
 

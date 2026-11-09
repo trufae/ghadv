@@ -9,7 +9,7 @@ C: manage advisory credits (finder, reporter, fix developer and other roles)
 c (or a): request CVE; d: accept/reopen as draft; p: publish; x: close
 s: advisory status; m: actions menu; f: cycle advisory state filter
 g: reload; A: cycle AI agent
-?: this help; q: quit
+?: this help; q or Ctrl+C: quit
 
 States: triage (private report), draft, published, closed.
 CVE assignment is separate from the advisory state and happens asynchronously.
@@ -92,7 +92,59 @@ fn key_hints(items []string, width int) string {
 	return out
 }
 
-// Interactive actions run with the terminal in cooked mode; input is a commit or URL.
+// Catch SIGINT while the CLI child handles the operation. Unlike SIG_IGN, a caught
+// handler resets on exec, so the child and its AI/editor still receive Ctrl+C.
+fn wait_for_workflow(_ os.Signal) {}
+
+fn tui_workflow(api GitHub, args ...string) ! {
+	terminal := os.exec(['stty', '-g'])
+	if terminal.exit_code != 0 { return error('workflow requires an interactive terminal') }
+	previous := os.signal_opt(.int, wait_for_workflow)!
+	defer { os.signal_opt(.int, previous) or {} }
+	code := os.system_args([os.executable(), '-r', api.repo, ...args])
+	// An interrupted editor may leave echo/canonical input disabled.
+	os.system_args(['stty', terminal.output.trim_space()])
+	if code == 130 {
+		return error_with_code('cancelled; recovery files, if created, are at the path printed above', 130)
+	}
+	if code != 0 { eprintln('Workflow exited with status ${code}') }
+	action_input('Press Enter to return (Ctrl+C/Esc also returns): ') or {}
+}
+
+// A cancellable line prompt, with the same key handling as the TUI forms.
+fn action_input(prompt string) ?string {
+	terminal := os.exec(['stty', '-g'])
+	if terminal.exit_code != 0 { return none }
+	os.system_args(['stty', '-icanon', '-echo', '-isig', 'min', '0', 'time', '2'])
+	defer {
+		os.system_args(['stty', terminal.output.trim_space()])
+		println('')
+	}
+	mut text := ''
+	for {
+		w, _ := term.get_terminal_size()
+		label := prompt#[..int_max(1, w - 2)]
+		runes := text.runes()
+		width := int_max(1, w - label.len - 1)
+		print('\r\x1b[2K${label}${runes#[int_max(0, runes.len - width)..].string()}')
+		os.flush()
+		k := key(false)
+		match k {
+			'\x1b', '\x03', '\x04' { return none }
+			'\n', '\r' { return text }
+			'\x15' { text = '' }
+			'\x7f', '\x08' {
+				text = runes#[..runes.len - 1].string()
+			}
+			else {
+				if k.len == 1 && k[0] >= 0x20 { text += k }
+			}
+		}
+	}
+	return none
+}
+
+// Interactive actions start in cooked mode; input is a commit or URL.
 fn run(k string, api GitHub, id string, input string) ! {
 	match k {
 		'?' {
@@ -108,23 +160,25 @@ fn run(k string, api GitHub, id string, input string) ! {
 			credits_tui(api, id)!
 		}
 		'e' {
-			cmd_edit(api, id)!
-			os.input('press enter')
+			tui_workflow(api, 'edit', id)!
 		}
 		'r' {
-			cmd_review(api, id, os.input('extra context: '))!
-			os.input('press enter')
+			println('Review ${id} with AI, then inspect its proposed changes in \$EDITOR.')
+			println('Example: Check the affected versions and whether the fix addresses the root cause.')
+			println('Enter to review; Ctrl+C or Esc to cancel. Ctrl+C also cancels the running AI.')
+			ctx := action_input('extra context (optional): ') or { return }
+			tui_workflow(api, 'review', id, ctx)!
 		}
 		'n' {
 			args := if input != '' {
 				input
 			} else {
-				os.input('commit or issue/PR URL [context]: ').trim_space()
+				action_input('commit or issue/PR URL [context] (Ctrl+C/Esc cancels): ') or { return }
 			}
-			if args != '' {
-				ctx := if args.contains(' ') { args.all_after_first(' ') } else { '' }
-				cmd_new(api, args.all_before(' '), ctx)!
-				os.input('press enter')
+			trimmed := args.trim_space()
+			if trimmed != '' {
+				ctx := if trimmed.contains(' ') { trimmed.all_after_first(' ') } else { '' }
+				tui_workflow(api, 'new', trimmed.all_before(' '), ctx)!
 			}
 		}
 		else {
@@ -390,7 +444,7 @@ fn credits_tui(api GitHub, id string) ! {
 fn tui(api GitHub, label string) {
 	saved := os.exec(['stty', '-g']).output.trim_space()
 	raw := fn () {
-		os.system_args(['stty', '-icanon', '-echo', 'min', '0', 'time', '2'])
+		os.system_args(['stty', '-icanon', '-echo', '-isig', 'min', '0', 'time', '2'])
 		print('\x1b[?25l\x1b[?1000h\x1b[?1006h')
 	}
 	cooked := fn [saved] () {
@@ -398,6 +452,7 @@ fn tui(api GitHub, label string) {
 		os.system_args(['stty', saved])
 		print('\x1b[?25h\x1b[H\x1b[2J')
 	}
+	defer { cooked() }
 	mut advs := api.advisories('') or { [['error:', err.msg()]] }
 	mut cms := commits() or { [['error:', err.msg()]] }
 	mut items := api.issues(label) or { [['error:', err.msg()]] }
@@ -524,7 +579,7 @@ fn tui(api GitHub, label string) {
 			}
 		}
 		match k {
-			'q' {
+			'q', '\x03' {
 				break
 			}
 			'j', '\x1b[B', 'J' {
@@ -576,8 +631,12 @@ fn tui(api GitHub, label string) {
 				}
 				cooked()
 				run(k, api, id, if k in ['e', 'r', 's', 'C'] { '' } else { show_input }) or {
-					println('error: ${err}')
-					os.input('press enter')
+					if err.code() == 130 {
+						status = err.msg()
+					} else {
+						println('error: ${err}')
+						action_input('Press Enter to return (Ctrl+C/Esc also returns): ') or {}
+					}
 				}
 				raw()
 				advs = api.advisories('') or { advs }
@@ -617,5 +676,4 @@ fn tui(api GitHub, label string) {
 			else {}
 		}
 	}
-	cooked()
 }

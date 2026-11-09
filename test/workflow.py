@@ -12,14 +12,17 @@ import signal
 import subprocess
 import sys
 import tempfile
+import termios
 import time
+
+from credits import Terminal
 
 
 ORIGINAL = '# GHSA-test draft\nsummary: Original\nseverity: high\n---\nBefore\n'
 REPLY = 'Review notes\nsummary: Revised\nseverity: high\n---\nAfter\n'
 MANUAL = 'summary: Manual\nseverity: low\n---\nResolved by hand\n'
 STUB = '''#!/usr/bin/env python3
-import json, os, sys, time
+import json, os, signal, subprocess, sys, time
 from pathlib import Path
 root = Path(os.environ['TEST_ROOT'])
 name = Path(sys.argv[0]).name
@@ -35,6 +38,8 @@ if name == 'gh':
             print('HTTP 422: rejected advisory', file=sys.stderr)
             sys.exit(1)
         print('GHSA-test')
+    elif '--paginate' in args:
+        print('GHSA-test\\tdraft\\t-\\thigh\\tTest advisory\\t\\t')
     else:
         print((root / 'original').read_text(), end='')
 elif name == 'ai':
@@ -42,12 +47,21 @@ elif name == 'ai':
         f.write('run\\n')
     print((root / 'reply').read_text(), end='', flush=True)
     if os.environ.get('AI_WAIT'):
+        signal.signal(signal.SIGINT, lambda *_: sys.exit(130))
         (root / 'ai.ready').touch()
-        time.sleep(30)
+        try:
+            time.sleep(30)
+        finally:
+            (root / 'ai.stopped').touch()
     sys.exit(int(os.environ.get('AI_EXIT', '0')))
 else:
     path = Path(sys.argv[1])
     mode = os.environ.get('EDITOR_MODE', '')
+    if mode == 'wait':
+        subprocess.run(['stty', '-icanon', '-echo', '-opost'], check=True)
+        signal.signal(signal.SIGINT, lambda *_: sys.exit(130))
+        print('Editor ready', flush=True)
+        time.sleep(30)
     if mode == 'fail':
         sys.exit(2)
     if mode == 'empty':
@@ -96,6 +110,93 @@ def setup(root):
 
 def payload(root):
     return json.loads((root / 'payload.json').read_text())
+
+
+def tui_checks(binary, root):
+    env = {'GHAV_AI': 'ai', 'EDITOR': 'editor', 'EDITOR_MODE': ''}
+    before = (root / 'payload.json').read_text()
+    writes = [line for line in (root / 'gh.calls').read_text().splitlines()
+              if '--input' in json.loads(line)]
+    ai_calls = (root / 'ai.calls').read_text()
+    sessions = set(root.glob('ghav-*'))
+    with Terminal(binary, root, 'tui', env) as ui:
+        ui.expect('C credits')
+        for cancel in ('\x03', '\x1b', '\x04'):
+            ui.send('r')
+            screen = ui.expect('extra context (optional):')
+            assert 'Example: Check the affected versions' in screen
+            assert 'Ctrl+C or Esc to cancel' in screen
+            ui.send('unfinished context' + cancel)
+            ui.expect('C credits')
+        ui.send('n')
+        ui.expect('commit or issue/PR URL')
+        ui.send('\x03')
+        ui.expect('C credits')
+        ui.send('\x03')
+        ui.finish()
+    assert (root / 'ai.calls').read_text() == ai_calls
+    assert set(root.glob('ghav-*')) == sessions
+
+    # Typed Ctrl+C during the AI returns to the list and preserves partial output.
+    (root / 'reply').write_text('partial TUI analysis\n')
+    (root / 'ai.ready').unlink(missing_ok=True)
+    (root / 'ai.stopped').unlink(missing_ok=True)
+    with Terminal(binary, root, 'tui', env | {'AI_WAIT': '1'}, controlling=True) as ui:
+        ui.expect('C credits')
+        ui.send('r')
+        ui.expect('extra context (optional):')
+        context = 'Check affected versions and whether the fix addresses the root cause; $(touch should-not-exist)'
+        ui.send(context + '\n')
+        screen = ui.expect('running ai ...')
+        directory = saved_dir(screen.replace('\r', ''))
+        deadline = time.monotonic() + 5
+        while not (root / 'ai.ready').exists():
+            assert time.monotonic() < deadline
+            time.sleep(0.02)
+        ui.send('\x03')
+        ui.expect('cancelled; recovery files')
+        ui.expect('C credits')
+        assert (directory / 'reply.txt').read_text() == 'partial TUI analysis\n'
+        assert 'Extra context: ' + context in (directory / 'prompt.txt').read_text()
+        assert not (root / 'should-not-exist').exists()
+        while not (root / 'ai.stopped').exists():
+            assert time.monotonic() < deadline
+            time.sleep(0.02)
+        ui.send('q')
+        ui.finish()
+
+    # Interrupting an editor that changed terminal modes also returns safely.
+    with Terminal(binary, root, 'tui', env | {'EDITOR_MODE': 'wait'}, controlling=True) as ui:
+        ui.expect('C credits')
+        ui.send('e')
+        screen = ui.expect('Editor ready')
+        directory = saved_dir(screen.replace('\r', ''))
+        ui.send('\x03')
+        ui.expect('cancelled; recovery files')
+        ui.expect('C credits')
+        assert (directory / 'edit.md').read_text() == ORIGINAL
+        assert termios.tcgetattr(ui.slave)[1] == ui.attributes[1], 'editor output mode not restored'
+        ui.send('q')
+        ui.finish()
+
+    # The recovery-choice prompt belongs to the child workflow too.
+    (root / 'reply').write_text(REPLY)
+    with Terminal(binary, root, 'tui', env | {'EDITOR_MODE': 'broken'}, controlling=True) as ui:
+        ui.expect('C credits')
+        ui.send('r')
+        ui.expect('extra context (optional):')
+        ui.send('\n')
+        screen = ui.expect('[q]uit and keep files [q]:')
+        directory = saved_dir(screen.replace('\r', ''))
+        ui.send('\x03')
+        ui.expect('cancelled; recovery files')
+        ui.expect('C credits')
+        assert (directory / 'review.diff').read_text().endswith('broken line\n')
+        ui.send('q')
+        ui.finish()
+    assert (root / 'payload.json').read_text() == before
+    assert [line for line in (root / 'gh.calls').read_text().splitlines()
+            if '--input' in json.loads(line)] == writes
 
 
 def checks(binary, root):
@@ -241,4 +342,5 @@ if __name__ == '__main__':
     binary = str(Path(sys.argv[1]).resolve())
     with tempfile.TemporaryDirectory(prefix='ghav-workflow-test-') as tmp:
         checks(binary, Path(tmp))
+        tui_checks(binary, Path(tmp))
     print('Workflow recovery checks passed')

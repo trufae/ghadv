@@ -95,6 +95,10 @@ and `f` to filter by state. Two rows of colored shortcuts show navigation and th
 available for the selection; `?` shows all keys. Use `j`/`k` or the mouse wheel to
 move down/up one row in the active list.
 
+Press `r` to review the selected advisory. The optional extra-context prompt includes an
+example, such as "Check the affected versions and whether the fix addresses the root
+cause." Enter starts the review; Ctrl+C or Escape cancels and returns to the list.
+
 Press **`C`** on an advisory (or choose it from `m`) to manage credits. You can also open
 that screen directly with `ghav credits GHSA-xxxx-yyyy-zzzz`. Use `a` to add, `e` to edit,
 `d` to delete, `?` to see all roles and `s` to save. Each entry pairs a GitHub username
@@ -152,8 +156,10 @@ the diff, take the full AI version, edit the result by hand, or quit and keep th
 GitHub save errors also offer editing the saved result or using the proposed version.
 
 Resume with `ghav resume <directory>`; it uses the saved repository and advisory and
-does not run the AI again. Ctrl+C during a workflow exits with status 130 and keeps saved
-edits and any output the agent has written so far. A partial reply may need repair in
+does not run the AI again. In the TUI, Ctrl+C during the AI or a recovery prompt cancels
+the operation and returns to the list; an interrupted editor also restores the terminal.
+Standalone CLI workflows exit with status 130 on Ctrl+C. Both keep saved edits and any
+output the agent has written so far. A partial reply may need repair in
 `reply.txt` before resuming. Recovery files are removed only after GitHub confirms the
 save. They live in the system temporary directory; copy the directory elsewhere to keep
 it across system cleanup. See [recovery details](doc/advisory-format.md#recovery).

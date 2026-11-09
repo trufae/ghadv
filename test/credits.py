@@ -52,7 +52,8 @@ else:
 
 
 class Terminal:
-    def __init__(self, binary, root, command='credits'):
+    def __init__(self, binary, root, command='credits', extra_env=None, controlling=False):
+        self.controlling = controlling
         self.master, self.slave = os.openpty()
         fcntl.ioctl(self.slave, termios.TIOCSWINSZ, struct.pack('HHHH', 24, 100, 0, 0))
         self.attributes = termios.tcgetattr(self.slave)
@@ -64,14 +65,17 @@ class Terminal:
             args, stdin=self.slave, stdout=self.slave, stderr=self.slave,
             env=os.environ | {'PATH': str(root) + os.pathsep + os.environ['PATH'],
                               'TEST_ROOT': str(root), 'TMPDIR': str(root),
-                              'GHAV_LABEL': '', 'TERM': 'xterm-256color'},
+                              'GHAV_LABEL': '', 'TERM': 'xterm-256color'} | (extra_env or {}),
             cwd=root, start_new_session=True,
+            # Make typed Ctrl+C reach the foreground process group, as in a real terminal.
+            preexec_fn=(lambda: fcntl.ioctl(0, termios.TIOCSCTTY, 0)) if controlling else None,
         )
 
     def read(self, timeout=0.1):
         if select.select([self.master], [], [], timeout)[0]:
-            self.buffer += os.read(self.master, 65536).decode(errors='replace')
-            return True
+            data = os.read(self.master, 65536)
+            self.buffer += data.decode(errors='replace')
+            return bool(data)
         return False
 
     def send(self, keys):
@@ -89,10 +93,20 @@ class Terminal:
         return ANSI.sub('', self.buffer)
 
     def finish(self):
-        assert self.process.wait(timeout=5) == 0, self.buffer
+        deadline = time.monotonic() + 5
+        while self.process.poll() is None:
+            assert time.monotonic() < deadline, self.buffer
+            self.read()
+        assert self.process.returncode == 0, self.buffer
         while self.read(0):
             pass
-        restored = termios.tcgetattr(self.slave)
+        try:
+            restored = termios.tcgetattr(self.slave)
+        except termios.error:
+            # macOS revokes the controlling PTY when its session leader exits.
+            if self.controlling and sys.platform == 'darwin':
+                return
+            raise
         # macOS sets the transient PENDIN flag when canonical input is restored.
         restored[3] &= ~getattr(termios, 'PENDIN', 0)
         self.attributes[3] &= ~getattr(termios, 'PENDIN', 0)
@@ -105,7 +119,10 @@ class Terminal:
     def __exit__(self, *_):
         if self.process.poll() is None:
             self.process.kill()
-            self.process.wait()
+            deadline = time.monotonic() + 5
+            while self.process.poll() is None and time.monotonic() < deadline:
+                self.read()
+            self.process.wait(timeout=1)
         os.close(self.master)
         os.close(self.slave)
 
