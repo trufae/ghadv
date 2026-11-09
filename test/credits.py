@@ -4,6 +4,7 @@
 Usage: python3 test/credits.py /path/to/ghadv
 """
 
+import codecs
 import fcntl
 import json
 import os
@@ -52,12 +53,14 @@ else:
 
 
 class Terminal:
-    def __init__(self, binary, root, command='credits', extra_env=None, controlling=False):
+    def __init__(self, binary, root, command='credits', extra_env=None, controlling=False,
+                 size=(100, 24)):
         self.controlling = controlling
         self.master, self.slave = os.openpty()
-        fcntl.ioctl(self.slave, termios.TIOCSWINSZ, struct.pack('HHHH', 24, 100, 0, 0))
+        fcntl.ioctl(self.slave, termios.TIOCSWINSZ, struct.pack('HHHH', size[1], size[0], 0, 0))
         self.attributes = termios.tcgetattr(self.slave)
         self.buffer = ''
+        self.decoder = codecs.getincrementaldecoder('utf-8')()
         args = [binary, '-r', 'owner/repo', command]
         if command == 'credits':
             args.append('GHSA-test')
@@ -74,7 +77,7 @@ class Terminal:
     def read(self, timeout=0.1):
         if select.select([self.master], [], [], timeout)[0]:
             data = os.read(self.master, 65536)
-            self.buffer += data.decode(errors='replace')
+            self.buffer += self.decoder.decode(data)
             return bool(data)
         return False
 

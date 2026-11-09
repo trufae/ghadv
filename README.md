@@ -44,6 +44,9 @@ ghadv [-r owner/repo] [command] [args]
 
 Run `ghadv` with no arguments for the TUI (advisory, commit and labeled issues/PRs tabs).
 Use `Tab` to cycle tabs forward and `Shift-Tab` to cycle backward, wrapping at either end.
+The TUI adapts to narrow and short terminals, keeps the selection visible when resized,
+and refreshes changed rows without clearing the screen. Small widths use compact rows;
+open an entry to read its full text. Menus and help scroll with `j`/`k` or the mouse wheel.
 Key commands:
 
 | Command | What |

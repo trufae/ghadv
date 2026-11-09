@@ -2,6 +2,200 @@ module main
 
 import os
 import term
+import encoding.utf8.east_asian
+
+// Count terminal cells, keeping combining characters and emoji sequences together.
+fn cell_width(grapheme string) int {
+	if grapheme.len == 1 && grapheme[0] < 0x80 { return 1 }
+	mut width := 0
+	for r in grapheme.runes() {
+		rune_width := term.printable_len(r.str())
+		if rune_width > 0 {
+			width = int_max(width, int_max(rune_width, east_asian.display_width(r.str(), 1)))
+		}
+		if r == 0xfe0f || (r >= 0x1f1e6 && r <= 0x1f1ff) { width = 2 }
+	}
+	return width
+}
+
+// Keep only SGR styling, flatten control characters, and never split a grapheme.
+// Every list entry occupies exactly one physical row, even with Unicode text.
+fn clip_line(text string, width int) string {
+	if width <= 0 { return '' }
+	mut out := ''
+	mut used := 0
+	mut styled := false
+	mut i := 0
+	for i < text.len {
+		if text[i] == 0x1b {
+			start := i
+			i++
+			if i < text.len && text[i] == `[` {
+				i++
+				for i < text.len && (text[i] < 0x40 || text[i] > 0x7e) { i++ }
+				if i < text.len {
+					if text[i] == `m` && text[start + 2..i].bytes().all(it.is_digit() || it in [`;`, `:`]) {
+						out += text[start..i + 1]
+						styled = true
+					}
+					i++
+				}
+			} else if i < text.len && text[i] in [`]`, `P`, `X`, `^`, `_`] {
+				i++
+				for i < text.len && text[i] != 7 && text[i] != 0x1b { i++ }
+				if i < text.len {
+					i += if text[i] == 0x1b && i + 1 < text.len && text[i + 1] == `\\` { 2 } else { 1 }
+				}
+			} else {
+				for i < text.len && text[i] >= 0x20 && text[i] <= 0x2f { i++ }
+				if i < text.len { i++ }
+			}
+			continue
+		}
+		start := i
+		for i < text.len && text[i] != 0x1b { i++ }
+		for g in text[start..i].graphemes() {
+			part := if g.runes().any(it < 0x20 || (it >= 0x7f && it < 0xa0)) { ' ' } else { g }
+			cells := cell_width(part)
+			if used + cells > width {
+				return out + if styled { '\x1b[0m' } else { '' }
+			}
+			out += part
+			used += cells
+		}
+	}
+	return out + if styled { '\x1b[0m' } else { '' }
+}
+
+fn terminal_size() (int, int) {
+	w, h := term.get_terminal_size()
+	return int_max(1, w), int_max(1, h)
+}
+
+fn line_width(w int) int {
+	return int_max(1, w - 1)
+}
+
+struct TuiLayout {
+	head int
+	page int
+	foot int
+}
+
+// Sacrifice chrome before list space; even a one-row terminal has a selection.
+fn tui_layout(height int, headers int, footers int) TuiLayout {
+	h := int_max(1, height)
+	head := if h >= headers + footers + 1 { headers } else if h >= 3 { int_min(1, headers) } else { 0 }
+	foot := int_min(footers, h - head - 1)
+	return TuiLayout{head, h - head - foot, foot}
+}
+
+fn list_top(top int, sel int, count int, page int) int {
+	return int_min(int_max(0, count - page), int_max(0, int_min(int_max(top, sel - page + 1), sel)))
+}
+
+fn list_frame(layout TuiLayout, headers []string, body []string, footers []string) []string {
+	mut lines := headers[..layout.head].clone()
+	for i in 0 .. layout.page { lines << if i < body.len { body[i] } else { '' } }
+	lines << footers[footers.len - layout.foot..]
+	return lines
+}
+
+struct TuiScreen {
+mut:
+	lines []string
+	width int
+}
+
+// Address rows explicitly: no newlines, terminal wrapping, or full-screen clears.
+// Updating only changed rows also makes a no-op reload produce no screen traffic.
+fn (mut screen TuiScreen) render(lines []string, width int, height int) string {
+	w, h := int_max(1, width), int_max(1, height)
+	mut next := []string{len: h}
+	mut out := ''
+	for i in 0 .. h {
+		next[i] = clip_line(if i < lines.len { lines[i] } else { '' }, line_width(w))
+		if screen.width != w || screen.lines.len != h || next[i] != screen.lines[i] {
+			out += '\x1b[${i + 1};1H\x1b[0m${next[i]}\x1b[0m\x1b[K'
+		}
+	}
+	screen.lines = next
+	screen.width = w
+	// Disable autowrap during painting, including when a resize races this frame.
+	return if out == '' { '' } else { '\x1b[?7l${out}\x1b[?7h' }
+}
+
+fn (mut screen TuiScreen) draw(lines []string, w int, h int) {
+	print(screen.render(lines, w, h))
+	os.flush()
+}
+
+const tui_enter = '\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1006h'
+const tui_leave = '\x1b[0m\x1b[?7h\x1b[?1000l\x1b[?1006l\x1b[?25h\x1b[?1049l'
+
+fn wrap_text(text string, width int) []string {
+	mut lines := []string{}
+	for line in text.split('\n') {
+		mut part := ''
+		mut used := 0
+		for g in term.strip_ansi(clip_line(line, line.len)).graphemes() {
+			cells := cell_width(g)
+			if used + cells > width && part != '' {
+				lines << part
+				part, used = '', 0
+			}
+			part += if cells > width { '?' } else { g }
+			used += int_min(cells, width)
+		}
+		lines << part
+	}
+	return lines
+}
+
+// Menus and confirmations can be read a page at a time at any terminal size.
+fn tui_dialog(text string) string {
+	mut screen := TuiScreen{}
+	mut top := 0
+	for {
+		w, h := terminal_size()
+		lines := wrap_text(text, line_width(w))
+		page := int_max(1, h - 1)
+		top = int_min(int_max(0, top), int_max(0, lines.len - page))
+		mut frame := lines[top..int_min(lines.len, top + page)].clone()
+		if h > 1 {
+			for frame.len < page { frame << '' }
+			frame << 'j/k: scroll; choose key; Enter/Esc: cancel'
+		}
+		screen.draw(frame, w, h)
+		k := key(w, h)
+		match k {
+			'' {}
+			'j', '\x1b[B' { top++ }
+			'k', '\x1b[A' { top-- }
+			'J', '\x1b[6~', ' ' { top += page }
+			'K', '\x1b[5~' { top -= page }
+			else { return k }
+		}
+	}
+	return ''
+}
+
+fn input_line(prompt string, text string, width int) string {
+	mut text_width := 0
+	for g in text.graphemes() { text_width += cell_width(g) }
+	reserved := int_min(text_width, int_max(1, width / 2))
+	label := clip_line(prompt, int_max(0, width - reserved))
+	available := int_max(0, width - term.printable_len(label))
+	mut tail := ''
+	mut used := 0
+	for g in text.graphemes().reverse() {
+		cells := cell_width(g)
+		if used + cells > available { break }
+		tail = g + tail
+		used += cells
+	}
+	return label + tail
+}
 
 const tui_help = 'tab/shift-tab: next/previous view (advisories/commits/issues)
 j/k or mouse wheel: move; J/K: move ten rows
@@ -47,7 +241,7 @@ fn severity_icon(severity string) string {
 
 fn crow(c []string, advs [][]string, w int) string {
 	if c.len < 3 {
-		return c.join(' ')
+		return clip_line(c.join(' '), line_width(w))
 	}
 	i := adv_of(advs, c[0])
 	mark := if i < 0 { term.dim('${'-':-20}') } else { color(advs[i][1], '${advs[i][0]:-20}') }
@@ -56,23 +250,32 @@ fn crow(c []string, advs [][]string, w int) string {
 	} else {
 		commit_severity(c[2])
 	}
-	return '${severity_icon(severity)} ${c[0][..10]} ${c[1]} ${mark} ${c[2]#[..w - 47]}'
+	line := if w < 40 { c[2] } else if w < 80 {
+		'${severity_icon(severity)} ${c[0]#[..10]} ${c[2]}'
+	} else { '${severity_icon(severity)} ${c[0]#[..10]} ${c[1]} ${mark} ${c[2]}' }
+	return clip_line(line, line_width(w))
 }
 
 fn irow(item []string, advs [][]string, w int) string {
 	if item.len < 5 {
-		return item.join(' ')
+		return clip_line(item.join(' '), line_width(w))
 	}
 	i := adv_of(advs, item[0])
 	mark := if i < 0 { term.dim('${'-':-20}') } else { color(advs[i][1], '${advs[i][0]:-20}') }
-	return '${'#' + item[1]:-8} ${item[2]:-5} ${item[3]:-7} ${mark} ${item[4]#[..w - 44]}'
+	line := if w < 40 { '#${item[1]} ${item[4]}' } else if w < 80 {
+		'#${item[1]} ${item[2]} ${item[3]} ${item[4]}'
+	} else { '${'#' + item[1]:-8} ${item[2]:-5} ${item[3]:-7} ${mark} ${item[4]}' }
+	return clip_line(line, line_width(w))
 }
 
 fn row(r []string, w int) string {
 	if r.len < 5 {
-		return r.join(' ')
+		return clip_line(r.join(' '), line_width(w))
 	}
-	return '${severity_icon(r[3])} ${r[0]:-20} ${color(r[1], '${r[1]:-10}')} ${r[2]:-15} ${r[3]:-9} ${r[4]#[..w - 62]}'
+	line := if w < 40 { r[4] } else if w < 80 {
+		'${severity_icon(r[3])} ${r[0]} ${color(r[1], r[1])} ${r[4]}'
+	} else { '${severity_icon(r[3])} ${r[0]:-20} ${color(r[1], '${r[1]:-10}')} ${r[2]:-15} ${r[3]:-9} ${r[4]}' }
+	return clip_line(line, line_width(w))
 }
 
 // Suggested actions depend on the advisory lifecycle, independently of CVE assignment.
@@ -103,12 +306,12 @@ fn key_hints(items []string, width int) string {
 	mut used := 0
 	for item in items {
 		space := if used == 0 { '' } else { ' ' }
-		if used + space.len + item.len > width {
+		if used + space.len + term.printable_len(item) > width {
 			break
 		}
 		out += space + term.bold(term.cyan(item.all_before(' '))) + ' ' +
 			term.dim(item.all_after_first(' '))
-		used += space.len + item.len
+		used += space.len + term.printable_len(item)
 	}
 	return out
 }
@@ -142,13 +345,12 @@ fn action_input(prompt string) ?string {
 	}
 	mut text := ''
 	for {
-		w, _ := term.get_terminal_size()
-		label := prompt#[..int_max(1, w - 2)]
+		w, h := terminal_size()
 		runes := text.runes()
-		width := int_max(1, w - label.len - 1)
-		print('\r\x1b[2K${label}${runes#[int_max(0, runes.len - width)..].string()}')
+		line := input_line(prompt, text, line_width(w))
+		print('\x1b[?7l\r${line}\x1b[K\x1b[?7h')
 		os.flush()
-		k := key(false)
+		k := key(w, h)
 		match k {
 			'\x1b', '\x03', '\x04' { return none }
 			'\n', '\r' { return text }
@@ -157,7 +359,7 @@ fn action_input(prompt string) ?string {
 				text = runes#[..runes.len - 1].string()
 			}
 			else {
-				if k.len == 1 && k[0] >= 0x20 { text += k }
+				if k != '' && k[0] >= 0x20 && k[0] != 0x7f { text += k }
 			}
 		}
 	}
@@ -167,15 +369,6 @@ fn action_input(prompt string) ?string {
 // Interactive actions start in cooked mode; input is a commit or URL.
 fn run(k string, api GitHub, id string, input string) ! {
 	match k {
-		'?' {
-			println(tui_help)
-			println('\nagent: ${os.getenv_opt('GHADV_AI') or { agents[0] }}')
-			os.input('press enter')
-		}
-		's' {
-			println(api.status(id)!)
-			os.input('press enter')
-		}
 		'C' {
 			credits_tui(api, id)!
 		}
@@ -270,9 +463,8 @@ fn act(k string, api GitHub, id string) !string {
 	return 'advisory updated; press s for status'
 }
 
-// polls one key or wheel event (stty time 2); returns '' when the terminal is resized
-fn key(resize bool) string {
-	w, h := term.get_terminal_size()
+// Poll one event against the painted size, including resizes during rendering.
+fn key(w int, h int) string {
 	for {
 		mut s, _ := os.fd_read(0, 1)
 		if s == '\x1b' {
@@ -315,10 +507,18 @@ fn key(resize bool) string {
 			}
 		}
 		if s != '' {
+			if s.len == 1 && s[0] >= 0xc2 && s[0] <= 0xf4 {
+				length := if s[0] < 0xe0 { 2 } else if s[0] < 0xf0 { 3 } else { 4 }
+				for s.len < length {
+					c, _ := os.fd_read(0, 1)
+					if c == '' { break }
+					s += c
+				}
+			}
 			return s
 		}
-		nw, nh := term.get_terminal_size()
-		if resize && (nw != w || nh != h) {
+		nw, nh := terminal_size()
+		if nw != w || nh != h {
 			return ''
 		}
 	}
@@ -326,28 +526,31 @@ fn key(resize bool) string {
 }
 
 // These forms stay in raw mode: Escape/Ctrl+C cancels a form, preserving staged edits.
-fn credit_login(current string) ?string {
-	print('\x1b[H\x1b[2J\x1b[?25h\x1b[?1000l\x1b[?1006l')
+fn tui_input(title string, prompt string, current string, ascii_only bool) ?string {
+	print('\x1b[?25h\x1b[?1000l\x1b[?1006l')
 	defer { print('\x1b[?25l\x1b[?1000h\x1b[?1006h') }
-	println('Credit a GitHub user\n\nEnter: next   Esc/Ctrl+C: cancel   Ctrl+U: clear\n')
-	mut login := current
+	mut screen := TuiScreen{}
+	mut text := current
 	for {
-		w, _ := term.get_terminal_size()
-		width := int_max(10, w - 12)
-		print('\r\x1b[2KUsername: ${login#[int_max(0, login.len - width)..]}')
+		w, h := terminal_size()
+		layout := tui_layout(h, 1, 1)
+		line := input_line(prompt, text, line_width(w))
+		screen.draw(list_frame(layout, [title], [line],
+			['Enter: next   Esc/Ctrl+C: cancel   Ctrl+U: clear']), w, h)
+		print('\x1b[${layout.head + 1};${int_min(w, term.printable_len(line) + 1)}H')
 		os.flush()
-		k := key(false)
+		k := key(w, h)
 		match k {
-			'\x1b', '\x03' { return none }
-			'\n', '\r' {
-				if login.trim_space() == '' { return none }
-				return login
+			'\x1b', '\x03', '\x04' { return none }
+			'\n', '\r' { return text }
+			'\x15' { text = '' }
+			'\x7f', '\x08' {
+				graphemes := text.graphemes()
+				text = graphemes#[..graphemes.len - 1].join('')
 			}
-			'\x15' { login = '' }
-			'\x7f', '\x08' { login = login#[..login.len - 1] }
 			else {
-				if k.len == 1 && k[0] >= 0x20 && k[0] < 0x7f && login.len < 80 {
-					login += k
+				if k != '' && k[0] >= 0x20 && k[0] != 0x7f {
+					if !ascii_only || (k.len == 1 && k[0] < 0x7f && text.len < 80) { text += k }
 				}
 			}
 		}
@@ -355,26 +558,31 @@ fn credit_login(current string) ?string {
 	return none
 }
 
+fn credit_login(current string) ?string {
+	login := tui_input('Credit a GitHub user', 'Username: ', current, true)?
+	if login.trim_space() == '' { return none }
+	return login
+}
+
 fn credit_role_picker(current string) ?string {
 	mut sel := int_max(0, credit_roles.map(it.typ).index(current))
 	mut top := 0
+	mut screen := TuiScreen{}
 	for {
-		w, h := term.get_terminal_size()
-		width := int_max(20, w - 1)
-		page := int_max(1, h - 6)
-		top = int_min(int_max(top, sel - page + 1), sel)
-		mut out := '\x1b[H\x1b[2J' + term.bold('Available credit roles') + '\n\n'
+		w, h := terminal_size()
+		layout := tui_layout(h, 2, 2)
+		page := layout.page
+		top = list_top(top, sel, credit_roles.len, page)
+		mut body := []string{}
 		for i in top .. int_min(credit_roles.len, top + page) {
 			role := credit_roles[i]
 			number := if i == 9 { 0 } else { i + 1 }
-			line := '${number} ${role.typ:-23} ${role.description}'#[..width]
-			out += if i == sel { term.inverse(line) } else { line } + '\n'
+			line := '${number} ${role.typ:-23} ${role.description}'
+			body << if i == sel { term.inverse(line) } else { line }
 		}
-		out += '\n' + credit_roles[sel].description#[..width]
-		out += '\n' + 'j/k or arrows: move; Enter/1-9/0: select; Esc/Ctrl+C: cancel'#[..width]
-		print(out)
-		os.flush()
-		k := key(true)
+		screen.draw(list_frame(layout, [term.bold('Available credit roles'), ''], body,
+			[credit_roles[sel].description, 'j/k or arrows: move; Enter/1-9/0: select; Esc/Ctrl+C: cancel']), w, h)
+		k := key(w, h)
 		match k {
 			'\x1b', '\x03', 'q' { return none }
 			'\n', '\r' { return credit_roles[sel].typ }
@@ -398,48 +606,51 @@ fn credits_tui(api GitHub, id string) ! {
 	mut saved := credits.clone()
 	// Read Ctrl+C as a key so exiting with unsaved changes offers save/discard/cancel.
 	os.system_args(['stty', '-icanon', '-echo', '-isig', 'min', '0', 'time', '2'])
-	print('\x1b[?25l\x1b[?1000h\x1b[?1006h')
+	print(tui_enter)
 	defer {
-		print('\x1b[?1000l\x1b[?1006l\x1b[?25h\x1b[H\x1b[2J')
+		print(tui_leave)
+		os.flush()
 		os.system_args(['stty', terminal.output.trim_space()])
 	}
 	mut sel := 0
 	mut top := 0
 	mut status := ''
+	mut screen := TuiScreen{}
 	for {
-		w, h := term.get_terminal_size()
-		width := int_max(20, w - 1)
-		page := int_max(1, h - 7)
+		w, h := terminal_size()
+		width := line_width(w)
+		layout := tui_layout(h, 3, 4)
+		page := layout.page
 		sel = int_min(int_max(0, sel), int_max(0, credits.len - 1))
-		top = int_min(int_max(top, sel - page + 1), sel)
+		top = list_top(top, sel, credits.len, page)
 		dirty := credits != saved
-		mut out := '\x1b[H\x1b[2J' + term.bold('Credits | ${api.repo} | ${id}'#[..width]) + '\n'
-		out += '${credits.len} entries' + if dirty { ' | unsaved changes\n' } else { ' | saved\n' }
-		out += '${'GITHUB USER':-24} ROLE\n'
+		headers := [term.bold('Credits | ${api.repo} | ${id}'),
+			'${credits.len} entries' + if dirty { ' | unsaved changes' } else { ' | saved' },
+			'${'GITHUB USER':-24} ROLE']
+		mut body := []string{}
 		for i in top .. int_min(credits.len, top + page) {
-			line := '${'@' + credits[i].login:-24} ${credits[i].typ}'#[..width]
-			out += if i == sel { term.inverse(line) } else { line } + '\n'
+			line := if w < 50 { '@${credits[i].login} ${credits[i].typ}' } else {
+				'${'@' + credits[i].login:-24} ${credits[i].typ}'
+			}
+			body << if i == sel { term.inverse(line) } else { line }
 		}
-		if credits.len == 0 { out += 'No credits yet. Press a to add a person.\n' }
+		if credits.len == 0 { body << 'No credits yet. Press a to add a person.' }
 		description := if credits.len > 0 {
 			credit_description(credits[sel].typ)
 		} else {
 			'One person can have several roles.'
 		}
-		out += '\x1b[${int_max(5, h - 3)};1H' + description#[..width] + '\n'
-		out += status#[..width] + '\n'
-		out += key_hints(['a add', 'e edit', 'd delete', 's save', '? roles', 'q back'], width) + '\n'
-		out += key_hints(['j/k move', 'enter edit', 'u undo all', 'Esc back'], width)
-		print(out)
-		os.flush()
-		mut k := key(true)
+		screen.draw(list_frame(layout, headers, body, [description, status,
+			key_hints(['a add', 'e edit', 'd delete', 's save', '? roles', 'q back'], width),
+			key_hints(['q back', 'j/k move', 'enter edit', 'u undo all', 'Esc back'], width)]), w, h)
+		mut k := key(w, h)
 		mut leave := false
+		if k == '' { continue }
 		status = ''
 		if k in ['q', '\x1b', '\x03'] {
 			if !dirty { return }
-			print('\r\x1b[2KUnsaved credits: [s]ave and exit, [d]iscard, [c]ancel: ')
-			os.flush()
-			match key(false) {
+			screen.width = 0
+			match tui_dialog('Unsaved credits: [s]ave and exit, [d]iscard, [c]ancel: ') {
 				'd' { return }
 				's' {
 					k = 's'
@@ -453,11 +664,15 @@ fn credits_tui(api GitHub, id string) ! {
 			'k', '\x1b[A' { sel-- }
 			'J' { sel += 10 }
 			'K' { sel -= 10 }
-			'?' { credit_role_picker('') or {} }
+			'?' {
+				screen.width = 0
+				credit_role_picker('') or {}
+			}
 			'a', 'e', '\n', '\r' {
 				if k != 'a' && credits.len == 0 { continue }
 				index := if k == 'a' { -1 } else { sel }
 				old := if index < 0 { Credit{} } else { credits[index] }
+				screen.width = 0
 				login := credit_login(old.login) or { continue }
 				typ := credit_role_picker(old.typ) or { continue }
 				credits = change_credit(credits, index, Credit{login, typ}) or {
@@ -499,12 +714,12 @@ fn tui(api GitHub, label string) {
 	saved := os.exec(['stty', '-g']).output.trim_space()
 	raw := fn () {
 		os.system_args(['stty', '-icanon', '-echo', '-isig', 'min', '0', 'time', '2'])
-		print('\x1b[?25l\x1b[?1000h\x1b[?1006h')
+		print(tui_enter)
 	}
 	cooked := fn [saved] () {
-		print('\x1b[?1000l\x1b[?1006l')
+		print(tui_leave)
+		os.flush()
 		os.system_args(['stty', saved])
-		print('\x1b[?25h\x1b[H\x1b[2J')
 	}
 	defer { cooked() }
 	mut advs := api.advisories('') or { [['error:', err.msg()]] }
@@ -516,12 +731,12 @@ fn tui(api GitHub, label string) {
 	mut status := ''
 	mut filter := 0
 	mut queries := ['', '', '']
+	mut screen := TuiScreen{}
 	raw()
 	for {
-		mut w, mut h := term.get_terminal_size()
-		if w < 20 || h < 6 {
-			w, h = 80, 24
-		}
+		w, h := terminal_size()
+		width := line_width(w)
+		layout := tui_layout(h, 2, 3)
 		mut visible := [][]int{len: 3}
 		for v, entries in [advs, cms, items] {
 			query := queries[v].to_lower()
@@ -538,10 +753,10 @@ fn tui(api GitHub, label string) {
 		if filter != 0 {
 			visible[0] = visible[0].filter(advs[it].len > 1 && advs[it][1] == states[filter])
 		}
-		page := h - 5
+		page := layout.page
 		n := visible[view].len
 		sel[view] = if n == 0 { 0 } else { int_min(int_max(sel[view], 0), n - 1) }
-		top[view] = int_min(int_max(top[view], sel[view] - page + 1), sel[view])
+		top[view] = list_top(top[view], sel[view], n, page)
 		selected := if n > 0 { visible[view][sel[view]] } else { -1 }
 		input := if view == 1 && selected >= 0 && cms[selected].len > 2 {
 			cms[selected][0]
@@ -563,16 +778,20 @@ fn tui(api GitHub, label string) {
 		}
 		tabs := ['advisories ${visible[0].len} (${states[filter]})', 'commits ${visible[1].len}',
 			'issues/PRs ${visible[2].len} (${label})']
-		header := 'ghadv ${api.repo} | ' + tabs.map(if it == tabs[view] { '[${it}]' } else { it }).join(' | ')
-		columns := if view == 0 {
+		full_header := 'ghadv ${api.repo} | ' + tabs.map(if it == tabs[view] { '[${it}]' } else { it }).join(' | ')
+		header := if term.printable_len(full_header) <= width { full_header } else { '[${tabs[view]}] | ${api.repo}' }
+		columns := if w < 40 {
+			if view == 0 { 'SUMMARY' } else if view == 1 { 'SUBJECT' } else { 'NUMBER TITLE' }
+		} else if w < 80 {
+			if view == 0 { '   ADVISORY STATE SUMMARY' } else if view == 1 { '   COMMIT     SUBJECT' } else { 'NUMBER TYPE STATE TITLE' }
+		} else if view == 0 {
 			'   ${'ADVISORY':-20} ${'STATE':-10} ${'CVE':-15} ${'SEVERITY':-9} SUMMARY'
 		} else if view == 1 {
 			'   ${'COMMIT':-10} ${'DATE':-10} ${'ADVISORY':-20} SUBJECT'
 		} else {
 			'${'NUMBER':-8} ${'TYPE':-5} ${'STATE':-7} ${'ADVISORY':-20} TITLE'
 		}
-		mut out := '\x1b[H\x1b[2J' + term.bold(header#[..w - 1]) + '\n' +
-			term.dim(columns#[..w - 1]) + '\n'
+		mut body := []string{}
 		for i in top[view] .. int_min(n, top[view] + page) {
 			index := visible[view][i]
 			mut line := ''
@@ -583,16 +802,16 @@ fn tui(api GitHub, label string) {
 			} else {
 				line = irow(items[index], advs, w)
 			}
-			out += if i == sel[view] { term.inverse(term.strip_ansi(line)) } else { line } + '\n'
+			body << if i == sel[view] { term.inverse(term.strip_ansi(line)) } else { line }
 		}
 		if n == 0 {
-			out += term.dim(if queries[view] != '' {
+			body << term.dim(if queries[view] != '' {
 				'No matches. Press / to change or clear the text filter.'
 			} else if view == 0 {
 				'No entries. Press f/F to change the filter or g to reload.'
 			} else {
 				'No entries. Press g to reload or n to enter a commit/URL.'
-			}) + '\n'
+			})
 		}
 		hint := if status != '' {
 			status
@@ -607,27 +826,22 @@ fn tui(api GitHub, label string) {
 			'No advisory selected; n creates a draft from a commit, issue or PR'
 		}
 		filter_hint := if queries[view] == '' { hint } else { '/${queries[view]} | ${hint}' }
-		out += '\x1b[${h - 2};1H' + filter_hint#[..w - 1] + '\n'
-		out += key_hints(['m actions', 'b similar bugs', 'C credits', 's status', ...actions, 'g reload', 'A agent'], w - 1) + '\n'
-		out += key_hints(['? help', 'q quit', 'tab/shift-tab views', '/ text', 'f/F state', 'j/k/J/K move',
-			'enter view', 'e edit', 'r review', 'n new'], w - 1)
-		print(out)
-		mut k := key(true)
+		screen.draw(list_frame(layout, [term.bold(header), term.dim(columns)], body, [filter_hint,
+			key_hints(['m actions', 'b similar bugs', 'C credits', 's status', ...actions, 'g reload', 'A agent'], width),
+			key_hints(['? help', 'q quit', 'tab/shift-tab views', '/ text', 'f/F state', 'j/k/J/K move',
+			'enter view', 'e edit', 'r review', 'n new'], width)]), w, h)
+		mut k := key(w, h)
 		mut show_input := input
+		if k == '' { continue }
 		status = ''
 		if k == 'm' {
 			if id == '' {
 				status = 'no advisory selected'
 				continue
 			}
-			print('\x1b[H\x1b[2J')
-			println(term.bold('Actions for ${id}'))
-			println('${advs[ai][4]}\n${hint}\n')
-			for action in actions {
-				println(key_hints([action], w - 1))
-			}
-			println('s status details\nv view advisory\ne edit advisory\nr AI review\nb Find similar bugs\nC manage credits\n\nChoose a key; Enter/Esc cancels.')
-			k = key(false)
+			screen.width = 0
+			k = tui_dialog('Actions for ${id}\n${advs[ai][4]}\n${hint}\n\n' + actions.join('\n') +
+				'\ns status details\nv view advisory\ne edit advisory\nr AI review\nb Find similar bugs\nC manage credits\n\nChoose a key; Enter/Esc cancels.')
 			if k == 'v' {
 				k = '\n'
 				show_input = ''
@@ -674,14 +888,12 @@ fn tui(api GitHub, label string) {
 				sel[0], top[0] = 0, 0
 			}
 			'/' {
-				cooked()
-				println('Text filter: Enter applies, empty clears, Esc/Ctrl+C cancels.')
-				println('Current filter: ${queries[view]}')
-				if query := action_input('Filter text: ') {
+				screen.width = 0
+				if query := tui_input('Text filter: Enter applies; empty clears; Esc cancels. Current: ${queries[view]}',
+					'Filter text: ', '', false) {
 					queries[view] = query.trim_space()
 					sel[view], top[view] = 0, 0
 				}
-				raw()
 			}
 			'A' {
 				// cycle the agent; a custom GHADV_AI is replaced by the presets
@@ -697,6 +909,15 @@ fn tui(api GitHub, label string) {
 			'\n', '\r', 'e', 'r', 'b', 'n', 's', 'C', '?' {
 				if id == '' && (k in ['e', 'r', 's', 'C'] || (k in ['\n', '\r', 'b'] && input == '')) {
 					status = 'no advisory selected; press n to create a draft'
+					continue
+				}
+				screen.width = 0
+				if k == '?' {
+					tui_dialog(tui_help + '\n\nagent: ${os.getenv_opt('GHADV_AI') or { agents[0] }}')
+					continue
+				}
+				if k == 's' {
+					tui_dialog(api.status(id) or { 'error: ${err}' })
 					continue
 				}
 				cooked()
@@ -733,8 +954,8 @@ fn tui(api GitHub, label string) {
 					'p' { 'PUBLISH' }
 					else { 'close' }
 				}
-				print('\x1b[${h - 1};1H\x1b[2K${verb} ${id}? [y/N] ')
-				if key(false) == 'y' {
+				screen.width = 0
+				if tui_dialog('${verb} ${id}? [y/N] ') == 'y' {
 					status = act(k, api, id) or { 'error: ' + err.msg().replace('\n', ' ') }
 					if status.starts_with('CVE request accepted;') {
 						// Keep the accepted request visible even if the reload fails.

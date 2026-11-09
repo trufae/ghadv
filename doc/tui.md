@@ -73,7 +73,7 @@ closing the advisory viewer. Enter alone, Escape or Ctrl+C returns to the list. 
 advisory from GitHub each time. A save is reported only after reloading and checking the
 editable fields; verification failures retain the recovery files.
 
-The bottom two rows separate colored keys from descriptions. The action row and `m` menu
+When space permits, the bottom two rows separate colored keys from descriptions. The action row and `m` menu
 offer actions appropriate to the selected advisory's state and CVE assignment. The status
 line above them shows the selection or the result of the last action. All lifecycle and
 CVE actions require confirmation; errors leave the advisory unchanged locally.
@@ -143,12 +143,28 @@ available in the regular editor.
 
 ## Terminal behavior
 
+The lists and forms use the actual terminal dimensions, including very narrow or short
+windows. Rows are clipped at Unicode character boundaries using terminal cell widths,
+so wide characters and severity circles do not wrap into neighboring rows. Narrow lists
+use compact columns, prioritizing titles on the smallest widths; open an entry for its
+full text. Short windows hide headers and shortcuts as needed to keep at least one entry
+visible. Selection and scrolling stay within the list after resizing or filtering.
+
+Menus, help, status details and confirmations wrap to the available width and scroll
+with `j`/`k`, arrows or the mouse wheel; `J`/`K` and Page Down/Page Up move a page. Their
+action keys still work, and Enter or Escape closes the screen without taking an action.
+
+The TUI uses the alternate terminal screen and redraws only changed lines, avoiding
+full-screen flashes and leaving the previous terminal contents intact on exit. An
+unchanged reload does not repaint the screen. Viewers, editors and AI workflows run
+outside this screen with normal terminal settings, then return to the list.
+
 After leaving the `r2` or pager view, use the advisory action prompt to view, review or
 edit again, or press Enter to return to the list.
 
 Mouse reporting is enabled while the TUI is active, so the wheel moves the selection
 instead of the terminal scrollback. It is disabled when opening a viewer, editor or
-prompt in cooked mode, and when quitting.
+text input prompt, and when quitting.
 
 The header shows the repository, active view and advisory filter. Pressing `A`
 cycles through `claude -p`, `codex exec -` and `pmai "$(cat)"`; a custom `GHADV_AI` is

@@ -118,11 +118,11 @@ def checks(binary, root):
         ui.expect('CVE request already recorded locally')
         assert len(requests()) == 1
         ui.send('g')
-        ui.expect('requested*')
+        ui.expect('CVE request recorded locally; g reload, s status')
         # A newly assigned ID replaces the receipt, including action hints.
         (root / 'assigned').write_text('CVE-2026-12345')
         ui.send('g')
-        screen = ui.expect('/ text')
+        screen = ui.expect('CVE-2026-12345')
         assert 'CVE-2026-12345' in screen and 'requested*' not in screen
         ui.send('c')
         ui.expect('CVE already assigned: CVE-2026-12345')

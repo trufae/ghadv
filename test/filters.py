@@ -96,7 +96,8 @@ def checks(binary, root):
             ui.send('different' + cancel)
             ui.expect('/bEtA |')
         ui.send('g')
-        ui.expect('/bEtA |')
+        # An unchanged reload emits no redraw; verify the retained selection instead.
+        selected_advisory(ui, 'GHSA-two')
         assert 'No matches.' in filter_text(ui, '[literal.*]')
         assert 'advisories 4 (all)' in filter_text(ui, '')
         selected_advisory(ui, 'GHSA-one')
