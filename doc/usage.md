@@ -144,8 +144,14 @@ submitting another request.
 
 GitHub accepts the request asynchronously. Check `ghadv status <ghsa>` or `ghadv ls` later.
 A missing CVE ID alone does not tell you whether a request is pending: the REST response
-does not expose that information. The TUI remembers successful requests for its current
-session and marks them `requested*`.
+does not expose that information. Successful requests from the CLI or TUI are saved
+locally and shown as `requested*` in lists across restarts. `ghadv status <ghsa>` shows
+the recorded acceptance time until a CVE is assigned. This records an accepted request,
+not its current position or status in GitHub's queue. See
+[local record storage](configuration.md#local-cve-request-records).
+
+The TUI suppresses repeat requests with a saved record. An explicit `ghadv cve <ghsa>`
+or `ghadv approve <ghsa>` still allows a retry when no CVE has been assigned.
 
 The equivalent direct command is:
 
@@ -177,5 +183,5 @@ advisory or rejects a report.
 | `closed` | closed advisory/report | reopen as draft |
 
 Editing, AI review, viewing and status remain available for each advisory. CVE request
-actions disappear after assignment or after a successful request in the current session.
+actions disappear after assignment or while a saved record of an accepted request exists.
 The API defines these [advisory states](https://docs.github.com/en/rest/security-advisories/repository-advisories#list-repository-security-advisories).

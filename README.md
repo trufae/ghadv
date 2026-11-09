@@ -19,6 +19,7 @@ $ ghadv new 8f3a2c1 found by fuzzing the PDB parser
 - Finds similar bugs using an advisory, CVE or fix commit as a template for an AI search.
 - Manages credits (finders, reporters, fix authors, ...) in a TUI screen.
 - Requests CVEs, accepts private reports, publishes and closes advisories. TUI actions confirm.
+- Saves accepted CVE requests locally, preserving `requested*` across restarts until a CVE is assigned.
 
 Advisories are plain text in `$EDITOR` — no JSON, no web forms.
 

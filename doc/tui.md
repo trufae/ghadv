@@ -79,10 +79,11 @@ line above them shows the selection or the result of the last action. All lifecy
 CVE actions require confirmation; errors leave the advisory unchanged locally.
 
 Published advisories without a CVE offer `c request CVE`. On success, the list shows
-`requested*`, meaning GitHub accepted a request during this session. This is a local
-acknowledgement, not a new advisory state or an API-reported pending status. Press `g`
-to refresh the assigned CVE; `s` displays the latest server details. Repeat requests are
-suppressed for the rest of the session, and assigned IDs replace the marker on refresh.
+`requested*`, meaning ghadv recorded GitHub accepting the request. The record is saved
+locally and restored after closing and reopening the app. Press `g` to refresh the
+assigned CVE; `s` displays server details and the locally recorded acceptance time.
+The TUI suppresses repeat requests while the record exists, including after a restart.
+Assigned IDs replace the marker on refresh. See [local record storage](configuration.md#local-cve-request-records).
 
 The state filter applies only to the advisory list; source links still use all advisories.
 Press `/`, type a substring, and press Enter to filter by row data such as a title, CVE,
