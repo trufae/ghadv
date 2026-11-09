@@ -105,3 +105,49 @@ fn test_wrapped_dialogs_and_input_tails() {
 	assert input_line('Filter: ', 'abc界', 1) == ''
 	assert input_line('Filter: ', 'abc界', 4) == 'Fi界'
 }
+
+fn test_list_cache_refreshes_links_filters_and_row_width() {
+	entries := [['abcdef1234567890', '2026-11-09', 'Fix bounds check 界'],
+		['1234567890abcdef', '2026-11-08', 'Other fix']]
+	advs := [['GHSA-one', 'draft', '-', 'high', 'Bounds check', 'abcdef1234', '']]
+	mut list := TuiList{}
+	list.rebuild(entries, [], AdvisoryLinks{}, 1)
+	list.filter(entries, 'GHSA-ONE', 'all')
+	assert list.visible == []int{}
+	assert !list.line(0, entries, [], 1, 120, false).contains('GHSA-one')
+	// Advisories can arrive after commits; both search and formatted links update.
+	list.rebuild(entries, advs, advisory_links(advs), 1)
+	list.filter(entries, 'GHSA-ONE', 'all')
+	assert list.visible == [0]
+	assert list.line(0, entries, advs, 1, 120, false).contains('GHSA-one')
+	assert list.line(0, entries, advs, 1, 30, false) == 'Fix bounds check 界'
+	assert term.strip_ansi(list.line(0, entries, advs, 1, 30, true)) == 'Fix bounds check 界'
+	list.filter(entries, '', 'all')
+	assert list.visible == [0, 1]
+	// A refresh removing a link cannot retain its text filter or severity.
+	list.rebuild(entries, [], AdvisoryLinks{}, 1)
+	list.filter(entries, 'ghsa-one', 'all')
+	assert list.visible == []int{}
+	assert !list.line(0, entries, [], 1, 120, false).contains('GHSA-one')
+}
+
+fn test_selection_movement_only_paints_two_rows() {
+	mut screen := TuiScreen{}
+	mut lines := []string{len: 30, init: 'Row ${index} 界 e\u0301'}
+	lines[4] = term.inverse(lines[4])
+	screen.render(lines, 100, 30)
+	lines[4] = term.strip_ansi(lines[4])
+	lines[5] = term.inverse(lines[5])
+	paint := screen.render(lines, 100, 30)
+	assert paint.count(';1H') == 2
+	assert paint.contains('\x1b[5;1H') && paint.contains('\x1b[6;1H')
+	assert screen.render(lines, 100, 30) == ''
+	// Scrolling moves already clipped rows; dropped content must leave the cache.
+	lines = lines[1..].clone()
+	lines << 'new bottom row'
+	assert screen.render(lines, 100, 30).count(';1H') == 30
+	assert 'Row 0 界 e\u0301' !in screen.clipped
+	assert screen.clipped.len == 30
+	assert screen.render(lines, 8, 30) != ''
+	assert screen.lines[29] == 'new bot'
+}

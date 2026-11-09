@@ -67,6 +67,10 @@ fn main() {
 		}
 		repo = s.repo
 	}
+	if cmd == 'tui' {
+		tui(GitHub{ repo: repo }, issue_label(id))
+		return
+	}
 	if repo == '' {
 		repo = github_repository() or {
 			eprintln('cannot find repository, use -r owner/repo or GHADV_REPO')
@@ -79,9 +83,6 @@ fn main() {
 	}
 	api := GitHub{ repo: repo }
 	match cmd {
-		'tui' {
-			tui(api, issue_label(id))
-		}
 		'ls' {
 			for r in api.advisories(id)! {
 				println(row(r, 999))

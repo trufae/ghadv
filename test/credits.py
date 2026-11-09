@@ -30,6 +30,8 @@ root = Path(os.environ['TEST_ROOT'])
 args = sys.argv[1:]
 with (root / 'calls').open('a') as f:
     f.write(json.dumps(args) + '\\n')
+if any('/issues?' in a for a in args):
+    sys.exit(0)
 assert 'repos/owner/repo/security-advisories' in ' '.join(args)
 if '--input' in args:
     assert args[args.index('--method') + 1] == 'PATCH'
@@ -54,14 +56,14 @@ else:
 
 class Terminal:
     def __init__(self, binary, root, command='credits', extra_env=None, controlling=False,
-                 size=(100, 24)):
+                 size=(100, 24), repo='owner/repo'):
         self.controlling = controlling
         self.master, self.slave = os.openpty()
         fcntl.ioctl(self.slave, termios.TIOCSWINSZ, struct.pack('HHHH', size[1], size[0], 0, 0))
         self.attributes = termios.tcgetattr(self.slave)
         self.buffer = ''
         self.decoder = codecs.getincrementaldecoder('utf-8')()
-        args = [binary, '-r', 'owner/repo', command]
+        args = [binary] + (['-r', repo] if repo else []) + [command]
         if command == 'credits':
             args.append('GHSA-test')
         self.process = subprocess.Popen(
@@ -224,7 +226,10 @@ def checks(binary, root):
     assert json.loads((root / 'credits.json').read_text()) == many
 
     # Both the main list shortcut and actions menu reach the dedicated screen.
+    (root / 'git').write_text('#!/bin/sh\nexit 0\n')
+    (root / 'git').chmod(0o700)
     with Terminal(binary, root, 'tui') as ui:
+        ui.expect('GHSA-test')
         ui.expect('C credits')
         ui.send('C')
         ui.expect('Credits | owner/repo | GHSA-test')

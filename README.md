@@ -44,6 +44,11 @@ ghadv [-r owner/repo] [command] [args]
 ```
 
 Run `ghadv` with no arguments for the TUI (advisory, commit and labeled issues/PRs tabs).
+The screen opens immediately while repository detection, GitHub lists and local Git
+details load in background threads. Each tab becomes usable as its data arrives;
+navigation and quitting stay responsive during loading and reloads. Reload failures
+keep the previous list. Searches, advisory links and formatted rows are cached, so
+moving the selection does not rescan the lists or reformat unchanged rows.
 Use `Tab` to cycle tabs forward and `Shift-Tab` to cycle backward, wrapping at either end.
 Tabs occupy their own second row, with the active tab highlighted in inverse colors.
 The top row shows the repository and local checkout's

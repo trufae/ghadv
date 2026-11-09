@@ -112,7 +112,7 @@ def checks(binary, root):
     assert 'request status unknown' in run('status', 'GHSA-other')
 
     with Terminal(binary, root, 'tui', env) as ui:
-        screen = ui.expect('/ text')
+        screen = ui.expect('requested*')
         assert 'requested*' in screen and 'c request CVE' not in screen
         ui.send('c')
         ui.expect('CVE request already recorded locally')

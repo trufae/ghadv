@@ -35,8 +35,10 @@ assert endpoint.startswith('repos/owner/repo/'), args
 if (root / 'fail-source').exists():
     print('HTTP 503: unavailable', file=sys.stderr)
     sys.exit(1)
-if endpoint == 'repos/owner/repo/security-advisories':
+if endpoint == 'repos/owner/repo/security-advisories?per_page=100':
     print((root / 'advisories').read_text(), end='')
+elif '/issues?' in endpoint:
+    sys.exit(0)
 elif endpoint == 'repos/owner/repo/security-advisories/GHSA-test':
     print((root / 'original').read_text(), end='')
 elif '/commits/' in endpoint or ('/pulls/' in endpoint and '-H' in args):
@@ -127,6 +129,7 @@ def cli_checks(binary, root):
 def tui_checks(binary, root):
     env = {'GHADV_AI': 'ai', 'EDITOR': 'editor'}
     with Terminal(binary, root, 'tui', env, controlling=True) as ui:
+        ui.expect('GHSA-test')
         ui.expect('b similar bugs')
         # Both the actions menu and the post-view advisory prompt expose the action.
         ui.send('m')
@@ -188,6 +191,7 @@ def tui_checks(binary, root):
 
     # Ctrl+C during the search returns to the list and preserves a resumable partial report.
     with Terminal(binary, root, 'tui', env | {'AI_WAIT': '1'}, controlling=True) as ui:
+        ui.expect('GHSA-test')
         ui.expect('b similar bugs')
         ui.send('b')
         ui.expect('extra context (optional):')

@@ -46,6 +46,18 @@ Keys:
 | `?` | show all keys and the active AI agent |
 | `q` / `Ctrl+C` | quit from the main list |
 
+Startup and `g` load advisories, commits, labeled issues/PRs and Git status in background
+threads. The screen opens before these requests complete; tabs show `loading...` until
+their first result arrives. You can navigate available lists, switch tabs, filter or quit
+while other requests run. Results appear automatically. A reload keeps the existing data
+visible, and a failed reload reports the error while retaining that data. Repeated `g`
+presses do not launch overlapping requests for the same list.
+
+Status requests show a loading screen that can be closed with Escape, Ctrl+C or `q`.
+Confirmed CVE and lifecycle updates also run in the background, allowing navigation
+while they finish. Further changes and quitting wait for the update to complete; its
+result appears in the status line and triggers a fresh advisory reload.
+
 In the commit and issues/PRs views, advisory actions act on the advisory that references
 the selected item. If there is none, press `n` to prepare a draft, review it in `$EDITOR`,
 then `c` to request a CVE. Issue/PR links require their full URL in the advisory description.
@@ -157,7 +169,10 @@ action keys still work, and Enter or Escape closes the screen without taking an 
 
 The TUI uses the alternate terminal screen and redraws only changed lines, avoiding
 full-screen flashes and leaving the previous terminal contents intact on exit. An
-unchanged reload does not repaint the screen. Viewers, editors and AI workflows run
+unchanged reload does not repaint the screen. Filters and advisory links are computed
+when data or filters change, and formatted rows are cached until data or width changes.
+Moving within a page normally paints only the old and new selections and any changed
+status or action hints. Idle polling does not rebuild frames. Viewers, editors and AI workflows run
 outside this screen with normal terminal settings, then return to the list.
 
 After leaving the `r2` or pager view, use the advisory action prompt to view, review or

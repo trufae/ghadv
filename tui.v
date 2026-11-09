@@ -113,6 +113,7 @@ fn tui_tabs(tabs []string, view int, width int) string {
 struct TuiScreen {
 mut:
 	lines []string
+	clipped map[string]string
 	width int
 }
 
@@ -121,22 +122,39 @@ mut:
 fn (mut screen TuiScreen) render(lines []string, width int, height int) string {
 	w, h := int_max(1, width), int_max(1, height)
 	mut next := []string{len: h}
+	mut clipped := map[string]string{}
 	mut out := ''
 	for i in 0 .. h {
-		next[i] = clip_line(if i < lines.len { lines[i] } else { '' }, line_width(w))
+		line := if i < lines.len { lines[i] } else { '' }
+		// Reuse clipping even when scrolling moves a row to a different position.
+		next[i] = if screen.width == w {
+			screen.clipped[line] or { clip_line(line, line_width(w)) }
+		} else { clip_line(line, line_width(w)) }
+		clipped[line] = next[i]
 		if screen.width != w || screen.lines.len != h || next[i] != screen.lines[i] {
 			out += '\x1b[${i + 1};1H\x1b[0m${next[i]}\x1b[0m\x1b[K'
 		}
 	}
 	screen.lines = next
+	// Bound the cache to the current frame; old views and widths are discarded.
+	screen.clipped = clipped
 	screen.width = w
 	// Disable autowrap during painting, including when a resize races this frame.
 	return if out == '' { '' } else { '\x1b[?7l${out}\x1b[?7h' }
 }
 
 fn (mut screen TuiScreen) draw(lines []string, w int, h int) {
-	print(screen.render(lines, w, h))
-	os.flush()
+	out := screen.render(lines, w, h)
+	nw, nh := terminal_size()
+	if nw != w || nh != h {
+		// A slow dialog may finish formatting after a resize. Discard that frame.
+		screen.width = 0
+		return
+	}
+	if out != '' {
+		print(out)
+		os.flush()
+	}
 }
 
 const tui_enter = '\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1006h'
@@ -249,13 +267,17 @@ fn severity_icon(severity string) string {
 }
 
 fn crow(c []string, advs [][]string, w int) string {
+	i := if c.len > 0 { adv_of(advs, c[0]) } else { -1 }
+	return commit_row(c, if i >= 0 { advs[i] } else { []string{} }, w)
+}
+
+fn commit_row(c []string, a []string, w int) string {
 	if c.len < 3 {
 		return clip_line(c.join(' '), line_width(w))
 	}
-	i := adv_of(advs, c[0])
-	mark := if i < 0 { term.dim('${'-':-20}') } else { color(advs[i][1], '${advs[i][0]:-20}') }
-	severity := if i >= 0 && severity_icon(advs[i][3]) != '⚪' {
-		advs[i][3]
+	mark := if a.len < 5 { term.dim('${'-':-20}') } else { color(a[1], '${a[0]:-20}') }
+	severity := if a.len >= 5 && severity_icon(a[3]) != '⚪' {
+		a[3]
 	} else {
 		commit_severity(c[2])
 	}
@@ -266,11 +288,15 @@ fn crow(c []string, advs [][]string, w int) string {
 }
 
 fn irow(item []string, advs [][]string, w int) string {
+	i := if item.len > 0 { adv_of(advs, item[0]) } else { -1 }
+	return issue_row(item, if i >= 0 { advs[i] } else { []string{} }, w)
+}
+
+fn issue_row(item []string, a []string, w int) string {
 	if item.len < 5 {
 		return clip_line(item.join(' '), line_width(w))
 	}
-	i := adv_of(advs, item[0])
-	mark := if i < 0 { term.dim('${'-':-20}') } else { color(advs[i][1], '${advs[i][0]:-20}') }
+	mark := if a.len < 5 { term.dim('${'-':-20}') } else { color(a[1], '${a[0]:-20}') }
 	line := if w < 40 { '#${item[1]} ${item[4]}' } else if w < 80 {
 		'#${item[1]} ${item[2]} ${item[3]} ${item[4]}'
 	} else { '${'#' + item[1]:-8} ${item[2]:-5} ${item[3]:-7} ${mark} ${item[4]}' }
@@ -475,6 +501,17 @@ fn act(k string, api GitHub, id string) !string {
 // Poll one event against the painted size, including resizes during rendering.
 fn key(w int, h int) string {
 	for {
+		s := poll_key()
+		if s != '' { return s }
+		nw, nh := terminal_size()
+		if nw != w || nh != h { return '' }
+	}
+	return ''
+}
+
+// A terminal read timeout also wakes the list to collect background results.
+fn poll_key() string {
+	for {
 		mut s, _ := os.fd_read(0, 1)
 		if s == '\x1b' {
 			// Read one complete escape sequence, leaving queued events for the next call.
@@ -526,10 +563,7 @@ fn key(w int, h int) string {
 			}
 			return s
 		}
-		nw, nh := terminal_size()
-		if nw != w || nh != h {
-			return ''
-		}
+		return ''
 	}
 	return ''
 }
@@ -719,10 +753,11 @@ fn credits_tui(api GitHub, id string) ! {
 	}
 }
 
-fn tui(api GitHub, label string) {
+fn tui(initial_api GitHub, label string) {
+	mut api := initial_api
 	saved := os.exec(['stty', '-g']).output.trim_space()
 	raw := fn () {
-		os.system_args(['stty', '-icanon', '-echo', '-isig', 'min', '0', 'time', '2'])
+		os.system_args(['stty', '-icanon', '-echo', '-isig', 'min', '0', 'time', '1'])
 		print(tui_enter)
 	}
 	cooked := fn [saved] () {
@@ -731,10 +766,17 @@ fn tui(api GitHub, label string) {
 		os.system_args(['stty', saved])
 	}
 	defer { cooked() }
-	mut advs := api.advisories('') or { [['error:', err.msg()]] }
-	mut cms := commits() or { [['error:', err.msg()]] }
-	mut items := api.issues(label) or { [['error:', err.msg()]] }
-	mut git_status := local_git_status()
+	mut advs := [][]string{}
+	mut cms := [][]string{}
+	mut items := [][]string{}
+	mut git_status := 'loading...'
+	mut loader := TuiLoader{}
+	action_results := chan TuiActionResult{cap: 1}
+	mut pending_action := ''
+	mut loaded := [false, false, false]
+	mut lists := []TuiList{len: 3}
+	mut changed := [true, true, true]
+	mut links := AdvisoryLinks{}
 	mut view := 0 // 0 advisories, 1 git, 2 labeled issues/PRs
 	mut sel := [0, 0, 0]
 	mut top := [0, 0, 0]
@@ -743,26 +785,96 @@ fn tui(api GitHub, label string) {
 	mut queries := ['', '', '']
 	mut screen := TuiScreen{}
 	raw()
+	loader.request(api, label, .commits, false)
+	loader.request(api, label, .git_status, false)
+	if api.repo == '' {
+		loader.request(api, label, .repository, false)
+	} else {
+		loader.request(api, label, .advisories, false)
+		loader.request(api, label, .issues, false)
+	}
 	for {
+		mut completed := TuiActionResult{}
+		if action_results.try_pop(mut completed) == .success {
+			pending_action = ''
+			status = completed.message
+			if status.starts_with('CVE request accepted;') || status.starts_with('advisory updated;') {
+				// Apply confirmed changes by ID even if the subsequent refresh fails.
+				for mut a in advs {
+					if a.len >= 5 && a[0] == completed.id {
+						match completed.key {
+							'a', 'c' { a[2] = 'requested*' }
+							'd' { a[1] = 'draft' }
+							'p' { a[1] = 'published' }
+							'x' { a[1] = 'closed' }
+							else {}
+						}
+					}
+				}
+				changed = [true, true, true]
+				if status.starts_with('CVE request accepted;') {
+					status = 'CVE request accepted; assignment is asynchronous. g reload, s status'
+				}
+			}
+			loader.request(api, label, .advisories, true)
+		}
+		for {
+			result := loader.poll(api, label) or { break }
+			// A late load failure must not hide an action result or cancellation.
+			if result.error != '' && status == '' {
+				status = '${result.kind}: ' + result.error.replace('\n', ' ')
+				if result.kind == .repository { status += '; use -r owner/repo or GHADV_REPO, g retries' }
+			}
+			match result.kind {
+				.repository {
+					if result.error == '' && result.text != '' {
+						api = GitHub{ repo: result.text }
+						loader.request(api, label, .advisories, false)
+						loader.request(api, label, .issues, false)
+					}
+				}
+				.advisories {
+					if result.error == '' && result.rows != advs {
+						advs = result.rows
+						links = advisory_links(advs)
+						changed = [true, true, true]
+					} else if result.error != '' && !loaded[0] {
+						advs = [['error:', result.error]]
+						changed[0] = true
+					}
+					loaded[0] = true
+				}
+				.commits {
+					if result.error == '' && result.rows != cms {
+						cms, changed[1] = result.rows, true
+					} else if result.error != '' && !loaded[1] {
+						cms, changed[1] = [['error:', result.error]], true
+					}
+					loaded[1] = true
+				}
+				.issues {
+					if result.error == '' && result.rows != items {
+						items, changed[2] = result.rows, true
+					} else if result.error != '' && !loaded[2] {
+						items, changed[2] = [['error:', result.error]], true
+					}
+					loaded[2] = true
+				}
+				.git_status { git_status = result.text }
+			}
+		}
 		w, h := terminal_size()
 		width := line_width(w)
 		layout := tui_layout(h, 3, 3)
-		mut visible := [][]int{len: 3}
 		for v, entries in [advs, cms, items] {
-			query := queries[v].to_lower()
-			for i, entry in entries {
-				mut text := entry.join(' ')
-				if v != 0 && query != '' && entry.len > 0 {
-					linked := adv_of(advs, entry[0])
-					if linked >= 0 { text += ' ' + advs[linked][0] }
-				}
-				if text.to_lower().contains(query) { visible[v] << i }
+			if changed[v] {
+				lists[v].rebuild(entries, advs, links, v)
+				changed[v] = false
 			}
+			lists[v].filter(entries, queries[v], if v == 0 { states[filter] } else { 'all' })
 		}
-		advisory_matches := visible[0].clone()
-		if filter != 0 {
-			visible[0] = visible[0].filter(advs[it].len > 1 && advs[it][1] == states[filter])
-		}
+		visible := [lists[0].visible, lists[1].visible, lists[2].visible]
+		advisory_matches := lists[0].matches
 		page := layout.page
 		n := visible[view].len
 		sel[view] = if n == 0 { 0 } else { int_min(int_max(sel[view], 0), n - 1) }
@@ -775,20 +887,21 @@ fn tui(api GitHub, label string) {
 		} else {
 			''
 		}
-		ai := if view == 0 {
-			selected
-		} else {
-			adv_of(advs, input)
-		}
+		ai := if selected >= 0 { lists[view].links[selected] } else { -1 }
 		id := if ai >= 0 && ai < advs.len && advs[ai].len >= 5 { advs[ai][0] } else { '' }
 		actions := if id != '' {
 			advisory_actions(advs[ai])
 		} else {
 			[]string{}
 		}
-		tabs := ['advisories ${visible[0].len} (${states[filter]})', 'commits ${visible[1].len}',
+		mut tabs := ['advisories ${visible[0].len} (${states[filter]})', 'commits ${visible[1].len}',
 			'issues/PRs ${visible[2].len} (${label})']
-		header := 'ghadv ${api.repo} | local git: ${git_status}'
+		repo_pending := loader.pending[int(TuiLoadKind.repository)]
+		for v in 0 .. tabs.len {
+			if !loaded[v] { tabs[v] += if v != 1 && api.repo == '' && !repo_pending { ' unavailable' } else { ' loading...' } }
+		}
+		repo_name := if api.repo != '' { api.repo } else if repo_pending { 'resolving repository...' } else { 'repository unavailable' }
+		header := 'ghadv ${repo_name} | local git: ${git_status}'
 		tab_line := tui_tabs(tabs, view, width)
 		columns := if w < 40 {
 			if view == 0 { 'SUMMARY' } else if view == 1 { 'SUBJECT' } else { 'NUMBER TITLE' }
@@ -802,20 +915,17 @@ fn tui(api GitHub, label string) {
 			'${'NUMBER':-8} ${'TYPE':-5} ${'STATE':-7} ${'ADVISORY':-20} TITLE'
 		}
 		mut body := []string{}
+		active_entries := if view == 0 { advs } else if view == 1 { cms } else { items }
 		for i in top[view] .. int_min(n, top[view] + page) {
 			index := visible[view][i]
-			mut line := ''
-			if view == 0 {
-				line = row(advs[index], w)
-			} else if view == 1 {
-				line = crow(cms[index], advs, w)
-			} else {
-				line = irow(items[index], advs, w)
-			}
-			body << if i == sel[view] { term.inverse(term.strip_ansi(line)) } else { line }
+			body << lists[view].line(index, active_entries, advs, view, w, i == sel[view])
 		}
 		if n == 0 {
-			body << term.dim(if queries[view] != '' {
+			body << term.dim(if !loaded[view] && view != 1 && api.repo == '' && !repo_pending {
+				'Cannot find repository. Use -r owner/repo or GHADV_REPO; g retries.'
+			} else if !loaded[view] {
+				'Loading... You can switch tabs or quit while requests run.'
+			} else if queries[view] != '' {
 				'No matches. Press / to change or clear the text filter.'
 			} else if view == 0 {
 				'No entries. Press f/F to change the filter or g to reload.'
@@ -823,7 +933,9 @@ fn tui(api GitHub, label string) {
 				'No entries. Press g to reload or n to enter a commit/URL.'
 			})
 		}
-		hint := if status != '' {
+		hint := if pending_action != '' {
+			'Updating ${pending_action}... You can keep browsing; other changes and quitting wait for completion.'
+		} else if status != '' {
 			status
 		} else if id != '' {
 			cve := match advs[ai][2] {
@@ -843,7 +955,13 @@ fn tui(api GitHub, label string) {
 			key_hints(['m actions', 'b similar bugs', 'C credits', 's status', ...actions, 'g reload', 'A agent'], width),
 			key_hints(['? help', 'q quit', 'tab/shift-tab views', '/ text', 'f/F state', 'j/k/J/K move',
 			'enter view', 'e edit', 'r review', 'n new'], width)]), w, h)
-		mut k := key(w, h)
+		mut k := ''
+		for {
+			if loader.results.len > 0 || action_results.len > 0 { break }
+			k = poll_key()
+			nw, nh := terminal_size()
+			if k != '' || nw != w || nh != h { break }
+		}
 		mut show_input := input
 		if k == '' { continue }
 		status = ''
@@ -861,6 +979,9 @@ fn tui(api GitHub, label string) {
 			} else if k !in ['s', 'e', 'r', 'b', 'C'] && !actions.any(it.starts_with(k + ' ')) {
 				continue
 			}
+		}
+		if pending_action != '' && k in ['q', '\x03', 'a', 'c', 'd', 'p', 'x', 'e', 'r', 'n', 'C', 'b', '\n', '\r'] {
+			continue
 		}
 		match k {
 			'q', '\x03' {
@@ -915,12 +1036,20 @@ fn tui(api GitHub, label string) {
 				status = 'agent: ${os.getenv('GHADV_AI')}'
 			}
 			'g' {
-				advs = api.advisories('') or { [['error:', err.msg()]] }
-				cms = commits() or { [['error:', err.msg()]] }
-				items = api.issues(label) or { [['error:', err.msg()]] }
-				git_status = local_git_status()
+				loader.request(api, label, .commits, false)
+				loader.request(api, label, .git_status, false)
+				if api.repo == '' {
+					loader.request(api, label, .repository, false)
+				} else {
+					loader.request(api, label, .advisories, false)
+					loader.request(api, label, .issues, false)
+				}
 			}
 			'\n', '\r', 'e', 'r', 'b', 'n', 's', 'C', '?' {
+				if api.repo == '' && k != '?' && !(view == 1 && k in ['\n', '\r']) {
+					status = 'Repository unavailable; wait for loading or press g to retry'
+					continue
+				}
 				if id == '' && (k in ['e', 'r', 's', 'C'] || (k in ['\n', '\r', 'b'] && input == '')) {
 					status = 'no advisory selected; press n to create a draft'
 					continue
@@ -931,7 +1060,7 @@ fn tui(api GitHub, label string) {
 					continue
 				}
 				if k == 's' {
-					tui_dialog(api.status(id) or { 'error: ${err}' })
+					tui_status(api, id)
 					continue
 				}
 				cooked()
@@ -944,8 +1073,8 @@ fn tui(api GitHub, label string) {
 					}
 				}
 				raw()
-				advs = api.advisories('') or { advs }
-				git_status = local_git_status()
+				if api.repo != '' { loader.request(api, label, .advisories, true) }
+				loader.request(api, label, .git_status, true)
 			}
 			'a', 'c', 'd', 'p', 'x' {
 				if id == '' {
@@ -971,13 +1100,8 @@ fn tui(api GitHub, label string) {
 				}
 				screen.width = 0
 				if tui_dialog('${verb} ${id}? [y/N] ') == 'y' {
-					status = act(k, api, id) or { 'error: ' + err.msg().replace('\n', ' ') }
-					if status.starts_with('CVE request accepted;') {
-						// Keep the accepted request visible even if the reload fails.
-						advs[ai][2] = 'requested*'
-						status = 'CVE request accepted; assignment is asynchronous. g reload, s status'
-					}
-					advs = api.advisories('') or { advs }
+					pending_action = id
+					spawn tui_action(api, k, id, action_results)
 				}
 			}
 			else {}

@@ -203,6 +203,7 @@ def tui_checks(binary, root):
     ai_calls = (root / 'ai.calls').read_text()
     sessions = set(root.glob('ghadv-*'))
     with Terminal(binary, root, 'tui', env) as ui:
+        ui.expect('GHSA-test')
         ui.expect('C credits')
         for cancel in ('\x03', '\x1b', '\x04'):
             ui.send('r')
@@ -224,6 +225,7 @@ def tui_checks(binary, root):
     (root / 'reply').write_text('Execution error')
     (root / 'editor-buffer').unlink()
     with Terminal(binary, root, 'tui', env, controlling=True) as ui:
+        ui.expect('GHSA-test')
         ui.expect('C credits')
         ui.send('r')
         ui.expect('extra context (optional):')
@@ -243,6 +245,7 @@ def tui_checks(binary, root):
     (root / 'ai.ready').unlink(missing_ok=True)
     (root / 'ai.stopped').unlink(missing_ok=True)
     with Terminal(binary, root, 'tui', env | {'AI_WAIT': '1'}, controlling=True) as ui:
+        ui.expect('GHSA-test')
         ui.expect('C credits')
         ui.send('r')
         ui.expect('extra context (optional):')
@@ -268,6 +271,7 @@ def tui_checks(binary, root):
 
     # Interrupting an editor that changed terminal modes also returns safely.
     with Terminal(binary, root, 'tui', env | {'EDITOR_MODE': 'wait'}, controlling=True) as ui:
+        ui.expect('GHSA-test')
         ui.expect('C credits')
         ui.send('e')
         screen = ui.expect('Editor ready')
@@ -283,6 +287,7 @@ def tui_checks(binary, root):
     # The recovery-choice prompt belongs to the child workflow too.
     (root / 'reply').write_text(REPLY)
     with Terminal(binary, root, 'tui', env | {'EDITOR_MODE': 'broken'}, controlling=True) as ui:
+        ui.expect('GHSA-test')
         ui.expect('C credits')
         ui.send('r')
         ui.expect('extra context (optional):')

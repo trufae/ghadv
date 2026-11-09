@@ -30,7 +30,7 @@ if name == 'git':
 else:
     assert args[0] == 'api' and '--method' not in args and '--input' not in args, args
     endpoint = next(a for a in args if a.startswith('repos/'))
-    if endpoint == 'repos/owner/repo/security-advisories':
+    if endpoint == 'repos/owner/repo/security-advisories?per_page=100':
         print((root / 'advisories').read_text(), end='')
     elif endpoint.startswith('repos/owner/repo/issues?'):
         print((root / 'issues').read_text(), end='')

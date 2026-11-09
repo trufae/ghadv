@@ -76,7 +76,7 @@ fn (api GitHub) advisories(state string) ![][]string {
 	if state != '' && state !in states {
 		return error('invalid state: ${state}; choose ${states.join(', ')}')
 	}
-	query := if state in ['', 'all'] { '' } else { '?state=${state}' }
+	query := '?per_page=100' + if state in ['', 'all'] { '' } else { '&state=${state}' }
 	out := gh('api', '--paginate', 'repos/${api.repo}/security-advisories${query}', '--jq', '.[] | [.ghsa_id, .state, .cve_id // "-", .severity // "-", .summary, ([.description // "" | scan("[0-9a-f]{10,40}")] | join(",")), ([.description // "" | scan("https://github[.]com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/(?:issues|pull)/[0-9]+")] | join(","))] | @tsv')!
 	mut rows := out.split_into_lines().filter(it != '').map(it.split('\t'))
 	for mut row in rows {

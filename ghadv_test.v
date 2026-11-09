@@ -142,3 +142,20 @@ fn test_source_advisory_links() {
 	assert adv_of([['error:', 'unavailable']], 'https://github.com/owner/repo/issues/123') == -1
 	assert adv_of(advs, '') == -1
 }
+
+fn test_indexed_advisory_links_preserve_first_match() {
+	advs := [
+		['GHSA-one', 'draft', '-', 'high', 'First', 'abcdef123456,1234567890', 'https://github.com/owner/repo/issues/12'],
+		['GHSA-two', 'published', '-', 'low', 'Second', 'abcdef1234', 'https://github.com/OWNER/REPO/issues/12'],
+		['error:', 'unavailable'],
+	]
+	links := advisory_links(advs)
+	// First advisory wins, even when another reference has a shorter prefix.
+	assert links.find('abcdef1234567890') == 0
+	assert links.find('abcdef1234abcd') == 1
+	for input in ['abcdef1234567890', 'abcdef1234abcd', '123456789000', '', 'deadbeef',
+		'https://github.com/OWNER/repo/issues/12', 'https://github.com/owner/repo/issues/123',
+		'https://github.com/other/repo/issues/12'] {
+		assert links.find(input) == adv_of(advs, input)
+	}
+}

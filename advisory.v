@@ -169,6 +169,41 @@ fn parse(text string) !Adv {
 }
 
 // URL references link issues/PRs; hex prefixes link commits.
+// Build once per advisory snapshot, so list navigation never scans descriptions.
+struct AdvisoryLinks {
+mut:
+	commits map[string]int
+	urls map[string]int
+}
+
+fn advisory_links(advs [][]string) AdvisoryLinks {
+	mut links := AdvisoryLinks{}
+	for i, a in advs {
+		if a.len > 5 {
+			for prefix in a[5].split(',') {
+				if prefix != '' && prefix !in links.commits { links.commits[prefix] = i }
+			}
+		}
+		if a.len > 6 {
+			for url in a[6].to_lower().split(',') {
+				if url != '' && url !in links.urls { links.urls[url] = i }
+			}
+		}
+	}
+	return links
+}
+
+fn (links AdvisoryLinks) find(input string) int {
+	if input.starts_with('https://') { return links.urls[input.to_lower()] or { -1 } }
+	mut first := -1
+	for end in 1 .. input.len + 1 {
+		if i := links.commits[input[..end]] {
+			if first < 0 || i < first { first = i }
+		}
+	}
+	return first
+}
+
 fn adv_of(advs [][]string, input string) int {
 	if input == '' {
 		return -1
