@@ -10,6 +10,7 @@ const help = 'Usage: ghav [-r owner/repo] [command] [args]
   new <commit|url> [context] analyze a commit, issue or PR with AI and create a draft
   show <ghsa>              print advisory
   status <ghsa>            show lifecycle, CVE and private report details
+  credits <ghsa>           manage credited people and roles in the TUI
   edit <ghsa>              edit advisory in \$EDITOR
   review <ghsa> [context]  let the AI review/rewrite it, then edit
   resume <directory>       continue saved work without running the AI again
@@ -105,6 +106,12 @@ fn main() {
 		}
 		'status' {
 			println(api.status(id)!)
+		}
+		'credits' {
+			credits_tui(api, id) or {
+				eprintln('error: ${err}')
+				exit(1)
+			}
 		}
 		'edit' {
 			cmd_edit(api, id) or {

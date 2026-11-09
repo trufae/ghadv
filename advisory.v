@@ -33,6 +33,56 @@ struct Credit {
 	typ   string @[json: 'type']
 }
 
+struct CreditRole {
+	typ         string
+	description string
+}
+
+// GitHub repository advisory credit types. Keep their API spellings in one place.
+const credit_roles = [
+	CreditRole{'finder', 'Discovered the vulnerability'},
+	CreditRole{'reporter', 'Reported the vulnerability'},
+	CreditRole{'analyst', 'Analyzed or documented the vulnerability'},
+	CreditRole{'coordinator', 'Coordinated disclosure and response'},
+	CreditRole{'remediation_developer', 'Developed the fix'},
+	CreditRole{'remediation_reviewer', 'Reviewed the fix'},
+	CreditRole{'remediation_verifier', 'Verified that the fix works'},
+	CreditRole{'tool', 'Tool used to discover or investigate the bug'},
+	CreditRole{'sponsor', 'Supported or funded the work'},
+	CreditRole{'other', 'Another contribution'},
+]
+
+fn credit_description(typ string) string {
+	for role in credit_roles {
+		if role.typ == typ { return role.description }
+	}
+	return 'Unknown role: ${typ}'
+}
+
+// A person can hold several roles, but each login/role pair must be unique.
+fn change_credit(credits []Credit, index int, input Credit) ![]Credit {
+	login := input.login.trim_space().trim_string_left('@')
+	name := login.trim_string_right('[bot]')
+	if name == '' || !name.bytes().all(it.is_alnum() || it == `-`) {
+		return error('enter a GitHub username, optionally starting with @')
+	}
+	if !credit_roles.any(it.typ == input.typ) {
+		return error('choose a credit role from the list')
+	}
+	if index < -1 || index >= credits.len {
+		return error('no credit selected')
+	}
+	for i, item in credits {
+		if i != index && item.login.to_lower() == login.to_lower() && item.typ == input.typ {
+			return error('@${login} already has the ${input.typ} credit')
+		}
+	}
+	mut result := credits.clone()
+	value := Credit{login, input.typ}
+	if index == -1 { result << value } else { result[index] = value }
+	return result
+}
+
 struct Adv {
 mut:
 	summary            string

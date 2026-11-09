@@ -20,6 +20,8 @@ $ ghav new 8f3a2c1 found by fuzzing the PDB parser
 - **Drafts** an advisory from a commit or GitHub issue/PR URL: the agent reads the report, discussion, patch when available, history and
   tags, and writes root cause, CWE, CVSS and the affected/patched versions.
 - **Reviews** existing advisories with the agent as a diff you accept or reject line by line.
+- **Manages credits** in a dedicated TUI screen for finders, reporters, fix authors and
+  other contributors, with a picker explaining every supported role.
 - **Requests CVEs**, including for published advisories, accepts private reports as drafts,
   publishes and closes. TUI actions ask for confirmation.
 - **Stays out of the way**: advisories are plain text in `$EDITOR`, no JSON, no web forms.
@@ -44,9 +46,10 @@ Use the same `BIN` value when installing, uninstalling or cleaning. Compile the 
 so V includes every source file.
 
 Run the focused source, advisory-link and review-diff tests with
-`v test ghadv_test.v workflow_test.v`. After building, run
-`python3 test/workflow.py /path/to/ghav` for recovery and Ctrl+C checks using stub
-commands; these checks do not access GitHub or run an AI agent.
+`v test ghadv_test.v workflow_test.v credits_test.v`. After building, run
+`python3 test/workflow.py /path/to/ghav` for recovery checks and
+`python3 test/credits.py /path/to/ghav` for the credits TUI and API checks. Both use stub
+commands and do not access GitHub or run an AI agent.
 
 The source files share one V module:
 
@@ -75,6 +78,7 @@ ghav [-r owner/repo] [command] [args]
   new <commit|url> [context] analyze a commit, issue or PR with AI and create a draft
   show <ghsa>             print an advisory
   status <ghsa>           show lifecycle, CVE and private report details
+  credits <ghsa>          manage credited people and roles in the TUI
   edit <ghsa>             edit an advisory in $EDITOR
   review <ghsa> [context] AI-review and rewrite it, then edit
   resume <directory>     continue saved work without running the AI again
@@ -90,6 +94,15 @@ switch, `m` for the selected advisory's actions, `c` to request a CVE, `s` for s
 and `f` to filter by state. Two rows of colored shortcuts show navigation and the actions
 available for the selection; `?` shows all keys. Use `j`/`k` or the mouse wheel to
 move down/up one row in the active list.
+
+Press **`C`** on an advisory (or choose it from `m`) to manage credits. You can also open
+that screen directly with `ghav credits GHSA-xxxx-yyyy-zzzz`. Use `a` to add, `e` to edit,
+`d` to delete, `?` to see all roles and `s` to save. Each entry pairs a GitHub username
+with a role; the same person can have several roles. The picker explains finder,
+reporter, analyst, coordinator, remediation developer/reviewer/verifier, tool, sponsor
+and other. Saving updates only credits and does not run the AI. Unsaved edits stay in
+the screen on API errors; `q`, Escape or Ctrl+C offers save/discard/cancel when needed.
+See [credits controls](doc/tui.md#credits-screen).
 
 To load your CVE label as a third tab, set `GHAV_LABEL` or pass the label to `tui`:
 

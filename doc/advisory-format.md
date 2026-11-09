@@ -30,6 +30,11 @@ markdown description
 
 For `new`, the agent's notes are shown above the advisory as `#` comments.
 
+Credits can also be managed with `C` in the TUI or `ghav credits <ghsa>`, using a separate
+screen with add/edit/delete controls and descriptions of all credit roles. See the
+[credits screen](tui.md#credits-screen). It updates only credits and leaves this editable
+format unchanged.
+
 ## Review diff
 
 `review` opens a full-context unified diff of the AI rewrite against the current advisory,

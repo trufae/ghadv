@@ -104,9 +104,23 @@ fn (api GitHub) issues(label string) ![][]string {
 	return out.split_into_lines().filter(it != '').map(it.split('\t'))
 }
 
-fn send(method string, path string, a Adv) !string {
+struct AdvisoryCredits {
+	credits []Credit
+}
+
+fn (api GitHub) credits(id string) ![]Credit {
+	return json2.decode[[]Credit](gh('api', 'repos/${api.repo}/security-advisories/${id}',
+		'--jq', '.credits // []')!)
+}
+
+fn (api GitHub) update_credits(id string, credits []Credit) ! {
+	send('PATCH', 'repos/${api.repo}/security-advisories/${id}',
+		json2.encode(AdvisoryCredits{ credits: credits }))!
+}
+
+fn send(method string, path string, payload string) !string {
 	f := os.join_path(os.temp_dir(), 'ghav-${os.getpid()}.json')
-	os.write_file(f, json2.encode(a))!
+	os.write_file(f, payload)!
 	defer {
 		os.rm(f) or {}
 	}
@@ -118,9 +132,9 @@ fn (api GitHub) set_state(id string, state string) ! {
 }
 
 fn (api GitHub) create_advisory(a Adv) !string {
-	return send('POST', 'repos/${api.repo}/security-advisories', a)!.trim_space()
+	return send('POST', 'repos/${api.repo}/security-advisories', json2.encode(a))!.trim_space()
 }
 
 fn (api GitHub) update_advisory(id string, a Adv) ! {
-	send('PATCH', 'repos/${api.repo}/security-advisories/${id}', a)!
+	send('PATCH', 'repos/${api.repo}/security-advisories/${id}', json2.encode(a))!
 }

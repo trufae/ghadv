@@ -12,6 +12,7 @@ ghav [-r owner/repo] [command] [args]
   new <commit|url> [context] analyze a commit, issue or PR with AI and create a draft
   show <ghsa>             print advisory
   status <ghsa>           show lifecycle, CVE and private report details
+  credits <ghsa>          manage credited people and roles in the TUI
   edit <ghsa>             edit advisory in $EDITOR
   review <ghsa> [context] let the AI review/rewrite it, then edit
   resume <directory>     continue saved work without running the AI again
@@ -100,6 +101,13 @@ The label is not removed after draft creation or CVE requests.
 `ghav review <ghsa> [context]` asks the agent to critique and rewrite the advisory, then
 opens a diff for you to accept or reject line by line. See [the advisory](advisory-format.md)
 for the diff rules.
+
+### credits
+
+`ghav credits <ghsa>` opens the credits TUI without running an AI agent. Add, edit or
+delete username/role entries and browse the full role list with `?`. Press `s` to save
+only the credits field. You can also reach this screen with `C` from the main TUI or
+its actions menu. See [credits controls and roles](tui.md#credits-screen).
 
 ### resume
 

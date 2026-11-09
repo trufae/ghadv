@@ -31,6 +31,7 @@ Keys:
 | `n` | draft from the selected commit or issue/PR; in the advisory view, prompt for a commit or URL and optional context |
 | `e` | edit the linked advisory |
 | `r` | AI-review the linked advisory |
+| `C` | manage credited people and roles for the linked advisory |
 | `m` | open the selected advisory's actions menu |
 | `c` / `a` | request a CVE, including for a published advisory |
 | `d` | accept a triage report or reopen a closed advisory as draft |
@@ -61,6 +62,55 @@ suppressed for the rest of the session, and assigned IDs replace the marker on r
 
 The state filter applies only to the advisory list; source links still use all advisories.
 Jumping to a linked advisory outside the current filter switches back to all.
+
+## Credits screen
+
+Press `C` in the list or actions menu, or run `ghav credits <ghsa>` directly. In the
+commit and issue/PR views, this opens credits for the linked advisory. The screen lists
+each GitHub username and role, with an explanation of the selected role below the list.
+
+| Key | Action |
+| --- | --- |
+| `a` | add a username and choose a role |
+| `e` / `enter` | edit the selected username and role |
+| `d` / `x` | remove the selected entry locally |
+| `j` / `k`, arrows, mouse wheel | move through entries or the role picker |
+| `J` / `K` | move ten entries |
+| `?` | browse every supported role without changing entries |
+| `s` | save the current credits to GitHub |
+| `u` | undo all changes since opening the screen or the last successful save |
+| `q` / `Esc` / `Ctrl+C` | return; if changed, choose save, discard or cancel |
+
+Usernames accept an optional leading `@`. In the username form, Backspace deletes,
+Ctrl+U clears the current name, and Enter continues to the role picker. Escape or Ctrl+C
+cancels either form without changing the list. Pick a role with arrows or `j`/`k` and
+Enter, or choose its numbered shortcut (`1`–`9`, `0` for the tenth role).
+
+The [GitHub credit roles](https://docs.github.com/en/rest/security-advisories/repository-advisories#update-a-repository-security-advisory)
+are:
+
+| Role | Contribution |
+| --- | --- |
+| `finder` | discovered the vulnerability |
+| `reporter` | reported the vulnerability |
+| `analyst` | analyzed or documented the vulnerability |
+| `coordinator` | coordinated disclosure and response |
+| `remediation_developer` | developed the fix |
+| `remediation_reviewer` | reviewed the fix |
+| `remediation_verifier` | verified the fix |
+| `tool` | tool used in discovery or investigation |
+| `sponsor` | supported or funded the work |
+| `other` | another contribution |
+
+Add separate entries if one person has several roles, such as finder and reporter.
+Duplicate username/role pairs are rejected, ignoring username case. GitHub validates
+that the usernames exist when saving. A failed save displays the error and retains your
+staged edits for correction or retry. Deleting every entry and saving clears all credits.
+Only the credits field is updated; the advisory text, severity and other fields are
+unaffected. This screen does not run the AI, and the plain-text `credits:` format remains
+available in the regular editor.
+
+## Terminal behavior
 
 After viewing an advisory with `r2`, press `enter` to return to the list.
 

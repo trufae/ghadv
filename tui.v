@@ -5,6 +5,7 @@ import term
 
 const tui_help = 'tab: switch advisories/commits/issues; j/k or mouse wheel: move; J/K: move ten rows
 enter: view advisory/commit/issue/PR; e: edit; r: AI review; n: new draft
+C: manage advisory credits (finder, reporter, fix developer and other roles)
 c (or a): request CVE; d: accept/reopen as draft; p: publish; x: close
 s: advisory status; m: actions menu; f: cycle advisory state filter
 g: reload; A: cycle AI agent
@@ -102,6 +103,9 @@ fn run(k string, api GitHub, id string, input string) ! {
 		's' {
 			println(api.status(id)!)
 			os.input('press enter')
+		}
+		'C' {
+			credits_tui(api, id)!
 		}
 		'e' {
 			cmd_edit(api, id)!
@@ -213,6 +217,176 @@ fn key(resize bool) string {
 	return ''
 }
 
+// These forms stay in raw mode: Escape/Ctrl+C cancels a form, preserving staged edits.
+fn credit_login(current string) ?string {
+	print('\x1b[H\x1b[2J\x1b[?25h\x1b[?1000l\x1b[?1006l')
+	defer { print('\x1b[?25l\x1b[?1000h\x1b[?1006h') }
+	println('Credit a GitHub user\n\nEnter: next   Esc/Ctrl+C: cancel   Ctrl+U: clear\n')
+	mut login := current
+	for {
+		w, _ := term.get_terminal_size()
+		width := int_max(10, w - 12)
+		print('\r\x1b[2KUsername: ${login#[int_max(0, login.len - width)..]}')
+		os.flush()
+		k := key(false)
+		match k {
+			'\x1b', '\x03' { return none }
+			'\n', '\r' {
+				if login.trim_space() == '' { return none }
+				return login
+			}
+			'\x15' { login = '' }
+			'\x7f', '\x08' { login = login#[..login.len - 1] }
+			else {
+				if k.len == 1 && k[0] >= 0x20 && k[0] < 0x7f && login.len < 80 {
+					login += k
+				}
+			}
+		}
+	}
+	return none
+}
+
+fn credit_role_picker(current string) ?string {
+	mut sel := int_max(0, credit_roles.map(it.typ).index(current))
+	mut top := 0
+	for {
+		w, h := term.get_terminal_size()
+		width := int_max(20, w - 1)
+		page := int_max(1, h - 6)
+		top = int_min(int_max(top, sel - page + 1), sel)
+		mut out := '\x1b[H\x1b[2J' + term.bold('Available credit roles') + '\n\n'
+		for i in top .. int_min(credit_roles.len, top + page) {
+			role := credit_roles[i]
+			number := if i == 9 { 0 } else { i + 1 }
+			line := '${number} ${role.typ:-23} ${role.description}'#[..width]
+			out += if i == sel { term.inverse(line) } else { line } + '\n'
+		}
+		out += '\n' + credit_roles[sel].description#[..width]
+		out += '\n' + 'j/k or arrows: move; Enter/1-9/0: select; Esc/Ctrl+C: cancel'#[..width]
+		print(out)
+		os.flush()
+		k := key(true)
+		match k {
+			'\x1b', '\x03', 'q' { return none }
+			'\n', '\r' { return credit_roles[sel].typ }
+			'j', '\x1b[B' { sel = int_min(sel + 1, credit_roles.len - 1) }
+			'k', '\x1b[A' { sel = int_max(sel - 1, 0) }
+			else {
+				if k.len == 1 && k[0].is_digit() {
+					i := if k == '0' { 9 } else { k.int() - 1 }
+					return credit_roles[i].typ
+				}
+			}
+		}
+	}
+	return none
+}
+
+fn credits_tui(api GitHub, id string) ! {
+	terminal := os.exec(['stty', '-g'])
+	if terminal.exit_code != 0 { return error('credits screen requires an interactive terminal') }
+	mut credits := api.credits(id)!
+	mut saved := credits.clone()
+	// Read Ctrl+C as a key so exiting with unsaved changes offers save/discard/cancel.
+	os.system_args(['stty', '-icanon', '-echo', '-isig', 'min', '0', 'time', '2'])
+	print('\x1b[?25l\x1b[?1000h\x1b[?1006h')
+	defer {
+		print('\x1b[?1000l\x1b[?1006l\x1b[?25h\x1b[H\x1b[2J')
+		os.system_args(['stty', terminal.output.trim_space()])
+	}
+	mut sel := 0
+	mut top := 0
+	mut status := ''
+	for {
+		w, h := term.get_terminal_size()
+		width := int_max(20, w - 1)
+		page := int_max(1, h - 7)
+		sel = int_min(int_max(0, sel), int_max(0, credits.len - 1))
+		top = int_min(int_max(top, sel - page + 1), sel)
+		dirty := credits != saved
+		mut out := '\x1b[H\x1b[2J' + term.bold('Credits | ${api.repo} | ${id}'#[..width]) + '\n'
+		out += '${credits.len} entries' + if dirty { ' | unsaved changes\n' } else { ' | saved\n' }
+		out += '${'GITHUB USER':-24} ROLE\n'
+		for i in top .. int_min(credits.len, top + page) {
+			line := '${'@' + credits[i].login:-24} ${credits[i].typ}'#[..width]
+			out += if i == sel { term.inverse(line) } else { line } + '\n'
+		}
+		if credits.len == 0 { out += 'No credits yet. Press a to add a person.\n' }
+		description := if credits.len > 0 {
+			credit_description(credits[sel].typ)
+		} else {
+			'One person can have several roles.'
+		}
+		out += '\x1b[${int_max(5, h - 3)};1H' + description#[..width] + '\n'
+		out += status#[..width] + '\n'
+		out += key_hints(['a add', 'e edit', 'd delete', 's save', '? roles', 'q back'], width) + '\n'
+		out += key_hints(['j/k move', 'enter edit', 'u undo all', 'Esc back'], width)
+		print(out)
+		os.flush()
+		mut k := key(true)
+		mut leave := false
+		status = ''
+		if k in ['q', '\x1b', '\x03'] {
+			if !dirty { return }
+			print('\r\x1b[2KUnsaved credits: [s]ave and exit, [d]iscard, [c]ancel: ')
+			os.flush()
+			match key(false) {
+				'd' { return }
+				's' {
+					k = 's'
+					leave = true
+				}
+				else { continue }
+			}
+		}
+		match k {
+			'j', '\x1b[B' { sel++ }
+			'k', '\x1b[A' { sel-- }
+			'J' { sel += 10 }
+			'K' { sel -= 10 }
+			'?' { credit_role_picker('') or {} }
+			'a', 'e', '\n', '\r' {
+				if k != 'a' && credits.len == 0 { continue }
+				index := if k == 'a' { -1 } else { sel }
+				old := if index < 0 { Credit{} } else { credits[index] }
+				login := credit_login(old.login) or { continue }
+				typ := credit_role_picker(old.typ) or { continue }
+				credits = change_credit(credits, index, Credit{login, typ}) or {
+					status = err.msg()
+					continue
+				}
+				if index < 0 { sel = credits.len - 1 }
+				status = 'Credit staged; press s to save to GitHub.'
+			}
+			'd', 'x' {
+				if credits.len > 0 {
+					credits.delete(sel)
+					status = 'Credit removed locally; s saves, u undoes all changes.'
+				}
+			}
+			'u' {
+				credits = saved.clone()
+				status = 'Unsaved changes undone.'
+			}
+			's' {
+				if !dirty {
+					status = 'No changes to save.'
+					continue
+				}
+				api.update_credits(id, credits) or {
+					status = 'Save failed; edits kept: ' + err.msg().replace('\n', ' ')
+					continue
+				}
+				saved = credits.clone()
+				status = 'Credits saved.'
+				if leave { return }
+			}
+			else {}
+		}
+	}
+}
+
 fn tui(api GitHub, label string) {
 	saved := os.exec(['stty', '-g']).output.trim_space()
 	raw := fn () {
@@ -322,7 +496,7 @@ fn tui(api GitHub, label string) {
 			'No advisory selected; n creates a draft from a commit, issue or PR'
 		}
 		out += '\x1b[${h - 2};1H' + hint#[..w - 1] + '\n'
-		out += key_hints(['m actions', 's status', ...actions, 'g reload', 'A agent'], w - 1) + '\n'
+		out += key_hints(['m actions', 'C credits', 's status', ...actions, 'g reload', 'A agent'], w - 1) + '\n'
 		out += key_hints(['? help', 'q quit', 'tab views', 'j/k/J/K move', 'enter view', 'e edit',
 			'r review', 'n new', 'f filter'], w - 1)
 		print(out)
@@ -340,12 +514,12 @@ fn tui(api GitHub, label string) {
 			for action in actions {
 				println(key_hints([action], w - 1))
 			}
-			println('s status details\nv view advisory\ne edit advisory\nr AI review\n\nChoose a key; Enter/Esc cancels.')
+			println('s status details\nv view advisory\ne edit advisory\nr AI review\nC manage credits\n\nChoose a key; Enter/Esc cancels.')
 			k = key(false)
 			if k == 'v' {
 				k = '\n'
 				show_input = ''
-			} else if k !in ['s', 'e', 'r'] && !actions.any(it.starts_with(k + ' ')) {
+			} else if k !in ['s', 'e', 'r', 'C'] && !actions.any(it.starts_with(k + ' ')) {
 				continue
 			}
 		}
@@ -395,13 +569,13 @@ fn tui(api GitHub, label string) {
 				cms = commits() or { [['error:', err.msg()]] }
 				items = api.issues(label) or { [['error:', err.msg()]] }
 			}
-			'\n', '\r', 'e', 'r', 'n', 's', '?' {
-				if id == '' && (k in ['e', 'r', 's'] || (k in ['\n', '\r'] && input == '')) {
+			'\n', '\r', 'e', 'r', 'n', 's', 'C', '?' {
+				if id == '' && (k in ['e', 'r', 's', 'C'] || (k in ['\n', '\r'] && input == '')) {
 					status = 'no advisory selected; press n to create a draft'
 					continue
 				}
 				cooked()
-				run(k, api, id, if k in ['e', 'r', 's'] { '' } else { show_input }) or {
+				run(k, api, id, if k in ['e', 'r', 's', 'C'] { '' } else { show_input }) or {
 					println('error: ${err}')
 					os.input('press enter')
 				}
