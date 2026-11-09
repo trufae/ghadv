@@ -69,13 +69,13 @@ fn test_small_layouts_and_scroll_limits() {
 
 fn test_tabs_keep_all_views_until_the_compact_row_no_longer_fits() {
 	tabs := ['advisories 12 (all)', 'commits 34', 'issues/PRs 5 (cve)']
-	assert tui_tabs(tabs, 0, 90) == '[advisories 12 (all)] | commits 34 | issues/PRs 5 (cve)'
-	assert tui_tabs(tabs, 1, 40) == 'advisories | [commits] | issues/PRs'
-	assert tui_tabs(tabs, 2, 40) == 'advisories | commits | [issues/PRs]'
-	assert tui_tabs(tabs, 1, 20) == '[commits 34]'
+	assert tui_tabs(tabs, 0, 90) == term.inverse('[advisories 12 (all)]') + ' | commits 34 | issues/PRs 5 (cve)'
+	assert tui_tabs(tabs, 1, 40) == 'advisories | ' + term.inverse('[commits]') + ' | issues/PRs'
+	assert tui_tabs(tabs, 2, 40) == 'advisories | commits | ' + term.inverse('[issues/PRs]')
+	assert tui_tabs(tabs, 1, 20) == term.inverse('[commits 34]')
 	for view in 0 .. tabs.len {
 		for width in 1 .. 100 {
-			line := tui_tabs(tabs, view, width)
+			line := term.strip_ansi(tui_tabs(tabs, view, width))
 			assert clip_line(line, width) == line
 			if width >= 20 { assert line.contains('[' + tabs[view].all_before(' ')) }
 		}

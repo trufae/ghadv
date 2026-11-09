@@ -103,10 +103,11 @@ fn list_frame(layout TuiLayout, headers []string, body []string, footers []strin
 
 fn tui_tabs(tabs []string, view int, width int) string {
 	for labels in [tabs, tabs.map(it.all_before(' '))] {
-		line := labels.map(if it == labels[view] { '[${it}]' } else { it }).join(' | ')
-		if clip_line(line, width) == line { return line }
+		line := labels.map(if it == labels[view] { term.inverse('[${it}]') } else { it }).join(' | ')
+		plain := term.strip_ansi(line)
+		if clip_line(plain, width) == plain { return line }
 	}
-	return clip_line('[${tabs[view]}]', width)
+	return term.inverse(clip_line('[${tabs[view]}]', width))
 }
 
 struct TuiScreen {
