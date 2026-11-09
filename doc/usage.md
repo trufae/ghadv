@@ -14,6 +14,7 @@ ghav [-r owner/repo] [command] [args]
   status <ghsa>           show lifecycle, CVE and private report details
   edit <ghsa>             edit advisory in $EDITOR
   review <ghsa> [context] let the AI review/rewrite it, then edit
+  resume <directory>     continue saved work without running the AI again
   cve <ghsa>              request a CVE id (asynchronous)
   approve <ghsa>          alias for cve
   draft <ghsa>            accept a report or reopen as a draft
@@ -99,6 +100,14 @@ The label is not removed after draft creation or CVE requests.
 `ghav review <ghsa> [context]` asks the agent to critique and rewrite the advisory, then
 opens a diff for you to accept or reject line by line. See [the advisory](advisory-format.md)
 for the diff rules.
+
+### resume
+
+`ghav resume <directory>` continues an interrupted or failed `new`, `edit` or `review`
+using the recovery path printed before work began. It reopens the saved edits and uses
+the saved repository and advisory ID, without calling the AI. Review errors offer
+repairing the diff, using the full AI version, manual editing, or quitting while keeping
+the files. See [recovery](advisory-format.md#recovery) for the files and Ctrl+C behavior.
 
 ### cve / approve
 

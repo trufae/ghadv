@@ -105,9 +105,11 @@ fn run(k string, api GitHub, id string, input string) ! {
 		}
 		'e' {
 			cmd_edit(api, id)!
+			os.input('press enter')
 		}
 		'r' {
 			cmd_review(api, id, os.input('extra context: '))!
+			os.input('press enter')
 		}
 		'n' {
 			args := if input != '' {
@@ -118,6 +120,7 @@ fn run(k string, api GitHub, id string, input string) ! {
 			if args != '' {
 				ctx := if args.contains(' ') { args.all_after_first(' ') } else { '' }
 				cmd_new(api, args.all_before(' '), ctx)!
+				os.input('press enter')
 			}
 		}
 		else {

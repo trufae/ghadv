@@ -43,7 +43,10 @@ Or build only: `make` (defaults to `ghadv`), or `v -o ghav .` for the name used 
 Use the same `BIN` value when installing, uninstalling or cleaning. Compile the directory
 so V includes every source file.
 
-Run the focused URL parsing and advisory-link tests with `v test ghadv_test.v`.
+Run the focused source, advisory-link and review-diff tests with
+`v test ghadv_test.v workflow_test.v`. After building, run
+`python3 test/workflow.py /path/to/ghav` for recovery and Ctrl+C checks using stub
+commands; these checks do not access GitHub or run an AI agent.
 
 The source files share one V module:
 
@@ -74,6 +77,7 @@ ghav [-r owner/repo] [command] [args]
   status <ghsa>           show lifecycle, CVE and private report details
   edit <ghsa>             edit an advisory in $EDITOR
   review <ghsa> [context] AI-review and rewrite it, then edit
+  resume <directory>     continue saved work without running the AI again
   cve <ghsa>              request a CVE id (asynchronous)
   approve <ghsa>          alias for cve
   draft <ghsa>            accept a report or reopen as a draft
@@ -127,6 +131,19 @@ when `r2` is on `PATH`, then press `enter` to return. Otherwise it opens in `$PA
 
 Agents: `claude -p` (default), `codex exec -`, `pmai` — anything that reads a prompt on
 stdin.
+
+`new`, `edit` and `review` print a private recovery directory before editing or running
+the agent. The AI reply, original advisory, proposed version, diff and saved edits stay
+there on errors or aborts. If a review diff cannot be applied or parsed, choose to retry
+the diff, take the full AI version, edit the result by hand, or quit and keep the files.
+GitHub save errors also offer editing the saved result or using the proposed version.
+
+Resume with `ghav resume <directory>`; it uses the saved repository and advisory and
+does not run the AI again. Ctrl+C during a workflow exits with status 130 and keeps saved
+edits and any output the agent has written so far. A partial reply may need repair in
+`reply.txt` before resuming. Recovery files are removed only after GitHub confirms the
+save. They live in the system temporary directory; copy the directory elsewhere to keep
+it across system cleanup. See [recovery details](doc/advisory-format.md#recovery).
 
 ## Documentation
 

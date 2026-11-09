@@ -12,6 +12,7 @@ const help = 'Usage: ghav [-r owner/repo] [command] [args]
   status <ghsa>            show lifecycle, CVE and private report details
   edit <ghsa>              edit advisory in \$EDITOR
   review <ghsa> [context]  let the AI review/rewrite it, then edit
+  resume <directory>       continue saved work without running the AI again
   cve <ghsa>               request a CVE id (asynchronous)
   approve <ghsa>           alias for cve
   draft <ghsa>             accept a report or reopen as a draft
@@ -38,6 +39,17 @@ fn main() {
 	cmd := if args.len > 0 { args[0] } else { 'tui' }
 	id := if args.len > 1 { args[1] } else { '' }
 	ctx := if args.len > 2 { args[2..].join(' ') } else { '' }
+	if cmd == 'resume' {
+		if id == '' {
+			eprintln('usage: ghav resume <recovery-directory>')
+			exit(1)
+		}
+		resume_edit(os.real_path(id), false) or {
+			eprintln('error: ${err}')
+			exit(1)
+		}
+		return
+	}
 	if cmd == 'new' && id != '' {
 		s := source(repo, id) or {
 			eprintln(err)
@@ -83,7 +95,10 @@ fn main() {
 			}
 		}
 		'new' {
-			cmd_new(api, id, ctx)!
+			cmd_new(api, id, ctx) or {
+				eprintln('error: ${err}')
+				exit(1)
+			}
 		}
 		'show' {
 			print(api.advisory(id)!)
@@ -92,10 +107,16 @@ fn main() {
 			println(api.status(id)!)
 		}
 		'edit' {
-			cmd_edit(api, id)!
+			cmd_edit(api, id) or {
+				eprintln('error: ${err}')
+				exit(1)
+			}
 		}
 		'review' {
-			cmd_review(api, id, ctx)!
+			cmd_review(api, id, ctx) or {
+				eprintln('error: ${err}')
+				exit(1)
+			}
 		}
 		'cve', 'approve' {
 			println(api.request_cve(id)!)
