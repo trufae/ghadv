@@ -5,10 +5,10 @@
 ```
 ghav [-r owner/repo] [command] [args]
 
-  tui [label]             interactive list (default), optionally with issues/PRs
+  tui [label]             advisory, commit and labeled issues/PRs tabs (default)
   ls [state]              list all/triage/draft/published/closed advisories
   log                     list ##crash/##security commits and their advisories
-  issues [label]          list labeled issues/PRs (default: GHAV_LABEL)
+  issues [label]          list labeled issues/PRs (default: GHAV_LABEL or cve)
   new <commit|url> [context] analyze a commit, issue or PR with AI and create a draft
   show <ghsa>             print advisory
   status <ghsa>           show lifecycle, CVE and private report details
@@ -82,12 +82,13 @@ does not request a CVE or publish; run `cve <ghsa>` after reviewing the draft.
 ### issues / tui label
 
 ```sh
+ghav -r owner/repo issues              # defaults to the cve label
 ghav -r owner/repo issues "needs-cve"
 ghav -r owner/repo tui "needs-cve"
 ```
 
-Both commands accept an optional label, defaulting to `GHAV_LABEL`. `issues` requires a
-label; `tui` adds its third issues/PRs tab only when one is set. Items are fetched across
+Both commands accept an optional label, defaulting to `GHAV_LABEL` or `cve` when unset
+or empty. The TUI always includes the third issues/PRs tab. Items are fetched across
 all pages and states, including closed issues and merged PRs. The list shows any advisory
 referencing each item's URL. Press `n` in that tab to draft from the selected item.
 The label is not removed after draft creation or CVE requests.

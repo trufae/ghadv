@@ -3,10 +3,10 @@ module main
 import os
 
 const help = 'Usage: ghav [-r owner/repo] [command] [args]
-  tui [label]              interactive list (default), optionally with issues/PRs
+  tui [label]              advisory, commit and labeled issues/PRs tabs (default)
   ls [state]               list all/triage/draft/published/closed advisories
   log                      list ##crash/##security commits and their advisories
-  issues [label]           list labeled issues/PRs (default: GHAV_LABEL)
+  issues [label]           list labeled issues/PRs (default: GHAV_LABEL or cve)
   new <commit|url> [context] analyze a commit, issue or PR with AI and create a draft
   show <ghsa>              print advisory
   status <ghsa>            show lifecycle, CVE and private report details
@@ -23,9 +23,17 @@ const help = 'Usage: ghav [-r owner/repo] [command] [args]
 Environment:
   GHAV_REPO   default repository (otherwise taken from the cwd checkout)
   GHAV_GREP   git log -E --grep for fix commits (default: ##(crash|security))
-  GHAV_LABEL  label for the issues/PRs tab (includes open and closed items)
+  GHAV_LABEL  issues/PRs label (default: cve; includes open and closed items)
   GHAV_AI     agent command, prompt is piped to stdin (default: claude -p)
               e.g. "codex exec -", \'pmai "\$(cat)"\''
+
+fn issue_label(label string) string {
+	if label != '' {
+		return label
+	}
+	configured := os.getenv('GHAV_LABEL')
+	return if configured != '' { configured } else { 'cve' }
+}
 
 fn main() {
 	mut args := os.args[1..].clone()
@@ -72,7 +80,7 @@ fn main() {
 	api := GitHub{ repo: repo }
 	match cmd {
 		'tui' {
-			tui(api, if id != '' { id } else { os.getenv('GHAV_LABEL') })
+			tui(api, issue_label(id))
 		}
 		'ls' {
 			for r in api.advisories(id)! {
@@ -86,13 +94,8 @@ fn main() {
 			}
 		}
 		'issues' {
-			label := if id != '' { id } else { os.getenv('GHAV_LABEL') }
-			if label == '' {
-				eprintln('specify a label: ghav issues <label>, or set GHAV_LABEL')
-				exit(1)
-			}
 			advs := api.advisories('')!
-			for item in api.issues(label)! {
+			for item in api.issues(issue_label(id))! {
 				println(irow(item, advs, 999))
 			}
 		}

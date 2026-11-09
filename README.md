@@ -74,10 +74,10 @@ payload handling stay in `github.v`.
 ```
 ghav [-r owner/repo] [command] [args]
 
-  tui [label]             interactive list (default), optionally with issues/PRs
+  tui [label]             advisory, commit and labeled issues/PRs tabs (default)
   ls [state]              list all/triage/draft/published/closed advisories
   log                     list fix commits and their advisories
-  issues [label]          list labeled issues/PRs (default: GHAV_LABEL)
+  issues [label]          list labeled issues/PRs (default: GHAV_LABEL or cve)
   new <commit|url> [context] analyze a commit, issue or PR with AI and create a draft
   show <ghsa>             print an advisory
   status <ghsa>           show lifecycle, CVE and private report details
@@ -93,7 +93,7 @@ ghav [-r owner/repo] [command] [args]
   close <ghsa>            close (reject)
 ```
 
-Run `ghav` with no arguments for the TUI: advisory and fix-commit views, `tab` to
+Run `ghav` with no arguments for the TUI: advisory, fix-commit and labeled issues/PRs views, `tab` to
 switch, `m` for the selected advisory's actions, `c` to request a CVE, `s` for status,
 and `f`/`F` to cycle the state filter forward/backward. Two rows of colored shortcuts show
 navigation and the actions available for the selection; `?` shows all keys. Use `j`/`k`
@@ -156,9 +156,12 @@ and other. Saving updates only credits and does not run the AI. Unsaved edits st
 the screen on API errors; `q`, Escape or Ctrl+C offers save/discard/cancel when needed.
 See [credits controls](doc/tui.md#credits-screen).
 
-To load your CVE label as a third tab, set `GHAV_LABEL` or pass the label to `tui`:
+The third tab lists issues and PRs labeled `cve` by default. To choose another label,
+set `GHAV_LABEL` or pass the label to `tui`:
 
 ```sh
+ghav -r owner/repo                     # includes the cve issues/PRs tab
+ghav -r owner/repo issues              # cve issues/PRs without the TUI
 ghav -r owner/repo tui "needs-cve"
 GHAV_LABEL="needs-cve" ghav -r owner/repo
 ghav -r owner/repo issues "needs-cve"    # the same list without the TUI
@@ -170,8 +173,8 @@ The label view includes open and closed issues/PRs, including merged PRs. Press 
 item to prepare a draft, review it in `$EDITOR`, then `c` on its linked advisory to request
 the CVE. `enter` shows the report and discussion. Links are recognized from issue/PR URLs
 in advisory descriptions; existing advisories without those references will not be linked.
-Labels stay unchanged. The positional label overrides `GHAV_LABEL`; without a label the
-TUI keeps its two original views.
+Labels stay unchanged. The positional label overrides `GHAV_LABEL`; when neither supplies
+a nonempty label, both the TUI and `issues` use `cve`.
 
 `new` accepts HTTPS `github.com` issue, PR and commit URLs, as well as commit hashes.
 The URL supplies the repository when neither `-r` nor `GHAV_REPO` is set; an explicit

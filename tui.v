@@ -560,10 +560,8 @@ fn tui(api GitHub, label string) {
 		} else {
 			[]string{}
 		}
-		mut tabs := ['advisories ${visible[0].len} (${states[filter]})', 'commits ${visible[1].len}']
-		if label != '' {
-			tabs << 'issues/PRs ${visible[2].len} (${label})'
-		}
+		tabs := ['advisories ${visible[0].len} (${states[filter]})', 'commits ${visible[1].len}',
+			'issues/PRs ${visible[2].len} (${label})']
 		header := 'ghav ${api.repo} | ' + tabs.map(if it == tabs[view] { '[${it}]' } else { it }).join(' | ')
 		columns := if view == 0 {
 			'   ${'ADVISORY':-20} ${'STATE':-10} ${'CVE':-15} ${'SEVERITY':-9} SUMMARY'

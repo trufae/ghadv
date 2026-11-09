@@ -13,9 +13,9 @@ Views, switched with `tab`:
 | --- | --- |
 | advisories | GHSA id, state, CVE id, severity, summary |
 | commits | tagged fix commits (`GHAV_GREP`), date, subject, and the advisory referencing them |
-| issues/PRs | items with `GHAV_LABEL` (or `ghav tui <label>`), number, type, state, linked advisory and title |
+| issues/PRs | items with `GHAV_LABEL` (default `cve`, or `ghav tui <label>`), number, type, state, linked advisory and title |
 
-The issues/PRs tab appears only when a label is configured. It includes every state, so
+The issues/PRs tab is always available and shows its label in the header. It includes every state, so
 closed issues and merged PRs remain available for reporting. `closed` in this list can
 mean either a merged or a closed, unmerged PR; `enter` shows its merge metadata.
 
