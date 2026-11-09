@@ -105,11 +105,12 @@ fn resume_edit(dir string, run_ai bool) ! {
 			}
 			println(id)
 		} else {
-			api.update_advisory(session.id, a) or {
+			warning := api.update_advisory(session.id, a) or {
 				eprintln('Could not save ${session.id}: ${err}\nEdited text and AI reply are saved in ${dir}')
 				if retry_save(dir) { continue }
 				return err
 			}
+			if warning != '' { eprintln('Warning: ${warning}') }
 			println('Saved changes to ${session.id} on GitHub.')
 		}
 		// A resumed directory may also contain files the user added; leave those alone.

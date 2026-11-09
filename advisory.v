@@ -118,6 +118,22 @@ fn advisory_changes(a Adv, b Adv) []string {
 	return fields
 }
 
+fn without_functions(a Adv) Adv {
+	mut r := a
+	r.vulnerabilities = a.vulnerabilities.map(Vuln{
+		...it
+		vulnerable_functions: []string{}
+	})
+	return r
+}
+
+// GitHub accepts vulnerable functions but discards them for some ecosystems (e.g. other).
+fn functions_discarded(sent Adv, saved Adv) bool {
+	return sent.vulnerabilities.any(it.vulnerable_functions.len > 0)
+		&& saved.vulnerabilities.all(it.vulnerable_functions.len == 0)
+		&& advisory_changes(without_functions(sent), saved).len == 0
+}
+
 fn parse(text string) !Adv {
 	sep := text.index('\n---\n') or { return error('missing --- separator') }
 	mut a := Adv{

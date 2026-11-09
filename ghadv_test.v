@@ -15,7 +15,18 @@ fn test_advisory_changes_compare_saved_fields() ! {
 	b.cwe_ids = []string{}
 	b.credits = []Credit{}
 	b.vulnerabilities = []Vuln{}
-	assert advisory_changes(a, b) == ['summary', 'description', 'severity', 'cvss', 'cwe', 'credits', 'vulnerabilities']
+	assert advisory_changes(a, b) == ['summary', 'description', 'severity', 'cvss', 'cwe', 'credits',
+		'vulnerabilities']
+}
+
+fn test_functions_discarded_by_github() ! {
+	sent := parse('summary: Test\npackage: one\necosystem: other\nfunctions: foo\n---\nDetails\n')!
+	saved := without_functions(sent)
+	assert functions_discarded(sent, saved)
+	assert !functions_discarded(saved, saved)
+	mut other := saved
+	other.summary = 'Different'
+	assert !functions_discarded(sent, other)
 }
 
 fn test_advisory_sources() ! {

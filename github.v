@@ -135,7 +135,8 @@ fn (api GitHub) create_advisory(a Adv) !string {
 	return send('POST', 'repos/${api.repo}/security-advisories', json2.encode(a))!.trim_space()
 }
 
-fn (api GitHub) update_advisory(id string, a Adv) ! {
+// Returns a warning when GitHub saved the update but discarded vulnerable functions.
+fn (api GitHub) update_advisory(id string, a Adv) !string {
 	send('PATCH', 'repos/${api.repo}/security-advisories/${id}', json2.encode(a))!
 	// A successful request alone does not prove the edited fields were saved.
 	text := api.advisory(id) or {
@@ -144,8 +145,12 @@ fn (api GitHub) update_advisory(id string, a Adv) ! {
 	saved := parse(text) or {
 		return error('GitHub accepted the update, but the reloaded advisory is invalid: ${err}')
 	}
+	if functions_discarded(a, saved) {
+		return 'GitHub did not store the vulnerable functions for ${saved.vulnerabilities.map(it.package.ecosystem).join(', ')} packages'
+	}
 	fields := advisory_changes(a, saved)
 	if fields.len > 0 {
 		return error('GitHub accepted the update, but the reloaded advisory differs in: ${fields.join(', ')}')
 	}
+	return ''
 }
