@@ -105,12 +105,11 @@ fn resume_edit(dir string, run_ai bool) ! {
 			}
 			println(id)
 		} else {
-			warning := api.update_advisory(session.id, a) or {
+			api.update_advisory(session.id, a) or {
 				eprintln('Could not save ${session.id}: ${err}\nEdited text and AI reply are saved in ${dir}')
 				if retry_save(dir) { continue }
 				return err
 			}
-			if warning != '' { eprintln('Warning: ${warning}') }
 			println('Saved changes to ${session.id} on GitHub.')
 		}
 		// A resumed directory may also contain files the user added; leave those alone.
@@ -328,7 +327,8 @@ For a PR, check whether it is merged and which releases contain the fix.
 Do not assume a closed issue or an unmerged PR is fixed or released; flag missing evidence
 and unknown affected/patched versions instead of inventing them.
 Determine whether it describes a real vulnerability, the root cause, attack vector and preconditions,
-the CWE, the CVSS 3.1 vector, the vulnerable functions and the affected and patched releases.
+the CWE, the CVSS 3.1 vector, the vulnerable functions (name them in the description) and the
+affected and patched releases.
 Do not assume every older release is affected: find when the vulnerable code was introduced.
 If the commit fixes several independent vulnerabilities, describe the most important one and
 list the others in your notes. Flag duplicates of the existing advisories listed below.

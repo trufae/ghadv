@@ -1,12 +1,11 @@
 module main
 
 fn test_advisory_changes_compare_saved_fields() ! {
-	a := parse('summary: Test\nseverity: high\ncvss: CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H\ncwe: CWE-787, CWE-125\ncredits: Alice:finder, Bob:reporter\npackage: one\necosystem: other\naffected: < 2\npatched: 2\nfunctions: foo, bar\npackage: two\n---\nDetails\n')!
+	a := parse('summary: Test\nseverity: high\ncvss: CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H\ncwe: CWE-787, CWE-125\ncredits: Alice:finder, Bob:reporter\npackage: one\necosystem: other\naffected: < 2\npatched: 2\nfunctions:\npackage: two\n---\nDetails\n')!
 	mut b := a
 	b.cwe_ids = a.cwe_ids.reverse()
 	b.credits = [Credit{'bob', 'reporter'}, Credit{'alice', 'finder'}]
 	b.vulnerabilities = a.vulnerabilities.reverse()
-	b.vulnerabilities[1].vulnerable_functions = ['bar', 'foo']
 	assert advisory_changes(a, b) == []string{}
 	b.summary = 'Different'
 	b.description = 'Changed body'
@@ -19,14 +18,10 @@ fn test_advisory_changes_compare_saved_fields() ! {
 		'vulnerabilities']
 }
 
-fn test_functions_discarded_by_github() ! {
-	sent := parse('summary: Test\npackage: one\necosystem: other\nfunctions: foo\n---\nDetails\n')!
-	saved := without_functions(sent)
-	assert functions_discarded(sent, saved)
-	assert !functions_discarded(saved, saved)
-	mut other := saved
-	other.summary = 'Different'
-	assert !functions_discarded(sent, other)
+fn test_functions_are_rejected() {
+	if _ := parse('summary: Test\npackage: one\nfunctions: foo\n---\nDetails\n') {
+		assert false
+	}
 }
 
 fn test_advisory_sources() ! {

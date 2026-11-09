@@ -11,7 +11,6 @@ package: <package name>
 ecosystem: other
 affected: <vulnerable version range, e.g. < 5.9.8>
 patched: <first patched version, e.g. 5.9.8>
-functions: <vulnerable function names, comma separated>
 ---
 <markdown description: Impact, Details (root cause), Proof of concept, Patches, References>'
 
@@ -25,7 +24,6 @@ mut:
 	package                  Pkg
 	vulnerable_version_range string @[omitempty]
 	patched_versions         string @[omitempty]
-	vulnerable_functions     []string
 }
 
 struct Credit {
@@ -110,28 +108,10 @@ fn advisory_changes(a Adv, b Adv) []string {
 		!= b.credits.map(it.login.to_lower() + ':' + it.typ).sorted() {
 		fields << 'credits'
 	}
-	mut av := a.vulnerabilities.clone()
-	mut bv := b.vulnerabilities.clone()
-	for mut v in av { v.vulnerable_functions = v.vulnerable_functions.sorted() }
-	for mut v in bv { v.vulnerable_functions = v.vulnerable_functions.sorted() }
-	if av.map(it.str()).sorted() != bv.map(it.str()).sorted() { fields << 'vulnerabilities' }
+	if a.vulnerabilities.map(it.str()).sorted() != b.vulnerabilities.map(it.str()).sorted() {
+		fields << 'vulnerabilities'
+	}
 	return fields
-}
-
-fn without_functions(a Adv) Adv {
-	mut r := a
-	r.vulnerabilities = a.vulnerabilities.map(Vuln{
-		...it
-		vulnerable_functions: []string{}
-	})
-	return r
-}
-
-// GitHub accepts vulnerable functions but discards them for some ecosystems (e.g. other).
-fn functions_discarded(sent Adv, saved Adv) bool {
-	return sent.vulnerabilities.any(it.vulnerable_functions.len > 0)
-		&& saved.vulnerabilities.all(it.vulnerable_functions.len == 0)
-		&& advisory_changes(without_functions(sent), saved).len == 0
 }
 
 fn parse(text string) !Adv {
@@ -170,7 +150,12 @@ fn parse(text string) !Adv {
 			'ecosystem' { last.package = Pkg{v, last.package.name} }
 			'affected' { last.vulnerable_version_range = v }
 			'patched' { last.patched_versions = v }
-			'functions' { last.vulnerable_functions = csv(v) }
+			'functions' {
+				// GitHub accepts vulnerable_functions but never stores them.
+				if v != '' {
+					return error('functions: GitHub does not store vulnerable functions; name them in the description')
+				}
+			}
 			else { return error('unknown field: ${k}') }
 		}
 	}
