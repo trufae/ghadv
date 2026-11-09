@@ -44,7 +44,7 @@ fn source(repo string, input string) !Source {
 
 // tagged fix commits in the cwd checkout: sha, date, subject
 fn commits() ![][]string {
-	grep := os.getenv_opt('GHADV_GREP') or { '##(crash|security)' }
+	grep := os.getenv_opt('GHADV_GREP') or { '##(crash|security|vulnerability|sandbox)' }
 	r := os.exec(['git', 'log', '-E', '--grep=${grep}', '-n', '2000', '--format=%H%x09%as%x09%s'])
 	if r.exit_code != 0 {
 		return error(r.output.trim_space())
@@ -93,9 +93,10 @@ fn local_git_status() string {
 	return '${parts[0]} | ${changes}' + if parts.len > 1 { ' | ' + parts[1..].join(' ') } else { '' }
 }
 
-// Rough display-only ratings from radare2 ##crash subjects, strongest match first.
+// Rough display-only ratings from tagged fix subjects, strongest match first.
 fn commit_severity(subject string) string {
 	message := subject.to_lower().replace('##crash', '').replace('##security', '')
+		.replace('##vulnerability', '').replace('##sandbox', '')
 	text := ' ' + message.bytes().map(if it.is_alnum() { it } else { u8(` `) }).bytestr()
 		.fields().join(' ') + ' '
 	for severity in ['critical', 'high', 'medium', 'low'] {

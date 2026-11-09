@@ -19,7 +19,8 @@ markdown description
 
 ## Rules
 
-- `#` lines are comments.
+- `#` lines before `---` are editor comments and are not saved to GitHub. After `---`,
+  Markdown headings and all other description text are part of the advisory.
 - `ecosystem`, `affected`, `patched` and `functions` attach to the preceding `package:`
   line. Repeat the group for more affected packages.
 - `severity` is dropped when `cvss` is set — GitHub rejects both.
@@ -28,7 +29,11 @@ markdown description
 - Invalid plain-text input reopens the editor until it parses or you decline at the
   `[Y/n]` prompt. Invalid review diffs offer the recovery choices below.
 
-For `new`, the agent's notes are shown above the advisory as `#` comments.
+For `new`, the agent's brief editorial notes are shown above the advisory as `#` comments.
+Useful findings, evidence, references to related findings, caveats and attribution must be
+included in the advisory fields or description below `---`, not only in these comments.
+Both drafting and review ask the agent to fill missing credits from verified source evidence
+and retain other names, handles and scan IDs in Acknowledgements.
 
 Credits can also be managed with `C` in the TUI or `ghadv credits <ghsa>`, using a separate
 screen with add/edit/delete controls and descriptions of all credit roles. See the

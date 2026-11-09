@@ -15,7 +15,9 @@ $ ghadv new 8f3a2c1 found by fuzzing the PDB parser
 - Lists advisories, local fix commits, and labeled issues/PRs.
 - Drafts an advisory from a commit or GitHub issue/PR URL: the agent reads the report,
   discussion, patch, history and tags, then writes root cause, CWE, CVSS and versions.
-  Finder/reporter attribution and scan IDs are preserved in credits or the advisory text.
+  Evidence, caveats and related finding references belong in the advisory text.
+  Drafting and review fill missing credits from verified sources and preserve names and scan IDs
+  in Acknowledgements when they cannot be represented as GitHub credits.
 - Reviews existing advisories with the agent as a diff you accept or reject line by line.
 - Finds similar bugs using an advisory, CVE or fix commit as a template for an AI search.
 - Manages credits (finders, reporters, fix authors, ...) in a TUI screen.
@@ -76,6 +78,9 @@ Key commands:
 | `resume <dir>` | continue saved work |
 | `cve <ghsa>` | request a CVE id |
 | `draft/publish/close <ghsa>` | change state |
+
+The `log` command and TUI commit tab include commits tagged `##crash`, `##security`,
+`##vulnerability` or `##sandbox` by default. Override the pattern with `GHADV_GREP`.
 
 Configuration lives in `GHADV_REPO`, `GHADV_LABEL`, `GHADV_AI`, `GHADV_GREP`, plus `$EDITOR`
 and `$PAGER`. See [doc/configuration.md](doc/configuration.md).

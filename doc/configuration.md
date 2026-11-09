@@ -3,7 +3,7 @@
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `GHADV_REPO` | cwd checkout | repository, `owner/repo` |
-| `GHADV_GREP` | `##(crash\|security)` | `git log -E --grep` pattern for fix commits |
+| `GHADV_GREP` | `##(crash\|security\|vulnerability\|sandbox)` | `git log -E --grep` pattern for fix commits |
 | `GHADV_LABEL` | `cve` | label for the issues/PRs tab and `issues` command; includes open and closed items |
 | `GHADV_AI` | `claude -p` | agent command, prompt on stdin |
 | `EDITOR` | `vi` | editor for drafts and reviews |

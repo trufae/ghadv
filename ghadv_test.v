@@ -18,7 +18,7 @@ fn test_git_change_indicators() {
 	assert git_changes(' M tracked\n?? filename\x00') == 'unstaged'
 }
 
-fn test_commit_severity_from_crash_subjects() {
+fn test_commit_severity_from_tagged_subjects() {
 	cases := {
 		'Fix null deref crash when parsing unnamed pdb globals ##crash': 'low'
 		'Fix NULL deref in ~?ea on empty output ##crash': 'low'
@@ -44,7 +44,10 @@ fn test_commit_severity_from_crash_subjects() {
 		'Fix shell injection in curl headers ##crash': 'critical'
 		'Validate PDB stream pages before reading ##crash': ''
 		'Update nullable metadata ##security': ''
-		'##crash ##security': ''
+		'Fix UAF ##vulnerability': 'high'
+		'Fix sandbox bypass ##sandbox': 'critical'
+		'Update ##sandbox bypass documentation': ''
+		'##crash ##security ##vulnerability ##sandbox': ''
 		'': ''
 	}
 	for subject, expected in cases {

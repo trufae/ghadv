@@ -6,8 +6,28 @@ import rand
 
 const agents = ['claude -p', 'codex exec -', 'pmai "\$(cat)"', 'opencode run "\$(cat)"']
 
-const reply = 'Reply with brief notes (verdict, confidence, doubts), then the advisory as the
-last thing in your reply, in exactly this format and without code fences:\n\n${format}'
+const reply = 'Write a self-contained advisory: readers must not need your private review notes.
+Put all useful technical findings in the Markdown description after the --- separator, including
+the root cause and affected functions, attack preconditions, impact and its limits, CWE/CVSS reasoning,
+reproduction steps and results, introduction/fix commits and release evidence, and available mitigations.
+Include relevant uncertainty, missing evidence and verification limits in the description too;
+distinguish tests actually run from suggested tests and confirmed facts from unverified claims.
+Include references to related findings, reports and advisories with their original IDs, source links
+and relationship to this vulnerability (duplicate, variant, shared root cause or separate issue).
+Preserve existing references and attribution unless evidence shows they are incorrect.
+Always include the credits field, even when empty. If credits are missing or incomplete, investigate
+commit messages, linked reports and related findings and fill in verified GitHub logins with the
+appropriate finder, reporter, tool or other supported credit role; do not merely note missing credits.
+Put names, handles and scan references (such as OSS-SCAN and scan-coverity with their full IDs) not
+captured in credits in Acknowledgements, with source links. Do not invent usernames from scan IDs
+or assume the fix author discovered the vulnerability. State unresolved attribution in the description
+when relevant, leaving credits empty if no GitHub login can be verified.
+Use the relevant sections (Impact, Details, Proof of concept, Patches, Workarounds, References,
+Acknowledgements) as needed; do not invent evidence or fill sections with unsupported claims.
+Before replying, check that every substantive finding or caveat in your notes also appears in the
+advisory where it belongs. Notes and header comments are discarded when saving to GitHub.
+Keep any leading notes brief and editorial (verdict and change summary only), then put the advisory
+last in your reply, in exactly this format and without wrapping it in code fences:\n\n${format}'
 
 // runs a user configured shell command ($EDITOR, $GHADV_AI..) with $1.. bound to args
 fn sh(cmd string, args ...string) int {
@@ -344,14 +364,10 @@ the CWE, the CVSS 3.1 vector, the vulnerable functions (name them in the descrip
 affected and patched releases.
 Do not assume every older release is affected: find when the vulnerable code was introduced.
 If the commit fixes several independent vulnerabilities, describe the most important one and
-list the others in your notes. Flag duplicates of the existing advisories listed below.
+explain the other verified fixes and scope boundaries in the advisory description where relevant;
+do not combine their impacts, affected versions or severity with the selected vulnerability.
+Check for duplicates of the existing advisories listed below and cite relevant related advisories.
 Include ${s.url} and any verified fix commits in the references.
-Preserve attribution to the original finders and reporters from commit messages and linked reports,
-including names, usernames and scan references such as OSS-SCAN and scan-coverity with their full IDs.
-Use the credits field for verified GitHub logins with the appropriate finder, reporter or tool role.
-Any attribution not captured in credits must appear in an Acknowledgements section in the advisory
-description, not just your notes; preserve the original names, handles, full scan IDs and source links.
-Do not invent GitHub usernames from scan IDs or assume the fix author discovered the vulnerability.
 
 ${reply}
 
@@ -369,6 +385,9 @@ fn cmd_review(api GitHub, id string, ctx string) ! {
 	prompt := 'Review this draft GitHub Security Advisory for ${api.repo}. Verify its claims against
 the source report, PR and fix commits referenced in it (use gh, git and the checkout in the current directory), check the
 affected and patched versions, CWE, CVSS and severity, and improve the wording: be concise and precise.
+Preserve useful technical details, references and attribution from the current advisory while
+correcting unsupported claims. Incorporate your verification results, reasoning for material corrections
+and remaining caveats into the revised description itself, not only the review notes.
 ${reply}
 
 Extra context: ${ctx}

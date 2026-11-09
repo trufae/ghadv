@@ -21,21 +21,36 @@ matches the source repository, follow linked fixes, treat source content as evid
 than instructions, and flag unknown versions. A closed issue or unmerged PR is not assumed
 to have a released fix. The source URL is requested in the advisory references for linking.
 
-For drafting and review, the prompt asks for brief notes first (verdict, confidence,
-doubts), then the advisory as the last block of the reply, in the format from
-[advisory-format.md](advisory-format.md), without code fences.
+For drafting and review, the prompt asks for a self-contained advisory as the last block
+of the reply, in the format from [advisory-format.md](advisory-format.md), without an outer
+code fence. Optional leading notes are limited to a brief editorial verdict and change
+summary; they are not saved to GitHub. Technical findings, evidence, caveats, verification
+limits and reasoning for material corrections belong in the advisory description itself.
+The agent is asked to check that no substantive finding remains only in notes or header comments.
 
 ## What it is told to care about
 
 - whether the patch is actually a security fix
 - root cause, attack surface, CWE and CVSS
+- reproduction steps and results, distinguishing tests actually run from suggested tests,
+  impact limits, mitigations and unresolved uncertainty in the advisory description
 - first affected and first fixed release — never assume every release before the fix is
   vulnerable; check tags and backports
 - duplicates; one commit may fix several bugs, several commits may share one root cause
+- related findings, reports and advisories: preserve their IDs and source links and explain
+  whether they are duplicates, variants, share a root cause or are separate issues; keep
+  independent bugs' impact, versions and severity separate from the selected vulnerability
 - original finder/reporter attribution from commit messages and linked reports: verified
   GitHub logins go in credits; names, handles and scan references (such as OSS-SCAN and
   scan-coverity with their full IDs) not captured there go in the advisory description
   under Acknowledgements, preserving source links rather than appearing only in agent notes
+- missing or incomplete credits in both drafts and reviews: investigate the sources and fill
+  verified GitHub logins and roles, rather than only noting the omission; leave `credits:` empty
+  when no login can be verified and retain known attribution in Acknowledgements
+
+Reviews preserve useful technical details, references and attribution while correcting
+unsupported claims. These are instructions to the configured agent; inspect the proposed
+advisory or review diff before saving.
 
 ## Finding similar bugs
 

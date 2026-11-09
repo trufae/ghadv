@@ -5,7 +5,7 @@ import os
 const help = 'Usage: ghadv [-r owner/repo] [command] [args]
   tui [label]              advisory, commit and labeled issues/PRs tabs (default)
   ls [state]               list all/triage/draft/published/closed advisories
-  log                      list ##crash/##security commits and their advisories
+  log                     list tagged fix commits and their advisories
   issues [label]           list labeled issues/PRs (default: GHADV_LABEL or cve)
   new <commit|url> [context] analyze a commit, issue or PR with AI and create a draft
   show <ghsa>              print advisory
@@ -22,7 +22,7 @@ const help = 'Usage: ghadv [-r owner/repo] [command] [args]
   close <ghsa>             close (reject) the advisory
 Environment:
   GHADV_REPO   default repository (otherwise taken from the cwd checkout)
-  GHADV_GREP   git log -E --grep for fix commits (default: ##(crash|security))
+  GHADV_GREP   git log -E --grep for fix commits (default: ##(crash|security|vulnerability|sandbox))
   GHADV_LABEL  issues/PRs label (default: cve; includes open and closed items)
   GHADV_AI     agent command, prompt is piped to stdin (default: claude -p)
                e.g. "codex exec -", \'pmai "\$(cat)"\', \'opencode run "\$(cat)"\''

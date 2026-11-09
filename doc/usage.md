@@ -7,7 +7,7 @@ ghadv [-r owner/repo] [command] [args]
 
   tui [label]             advisory, commit and labeled issues/PRs tabs (default)
   ls [state]              list all/triage/draft/published/closed advisories
-  log                     list ##crash/##security commits and their advisories
+  log                    list tagged fix commits and their advisories
   issues [label]          list labeled issues/PRs (default: GHADV_LABEL or cve)
   new <commit|url> [context] analyze a commit, issue or PR with AI and create a draft
   show <ghsa>             print advisory
@@ -59,6 +59,7 @@ An optional state filters the results: `ghadv ls triage`, `ghadv ls draft`,
 ### log
 
 Lists local commits matching `GHADV_GREP` and the advisory that references each of them.
+By default, it matches `##crash`, `##security`, `##vulnerability` and `##sandbox` tags.
 This is how you spot fixes that nobody reported yet:
 
 ```

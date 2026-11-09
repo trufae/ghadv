@@ -314,6 +314,34 @@ def checks(binary, root):
     assert 'Saved changes to GHSA-test on GitHub.' in result.stdout
     assert not saved_dir(result.stdout).exists()
 
+    # Reader-facing findings and recovered credits must survive both save paths.
+    description = '''## Details
+An unchecked length in parse_record permits an out-of-bounds read of crafted input.
+
+## Related findings
+[OSS-SCAN-123](https://github.com/owner/repo/issues/123) is a variant in another reader;
+its affected versions are not established by this fix.
+
+## Verification limits
+The patch was inspected; the reproducer was not run and the first fixed release is unknown.
+
+## Acknowledgements
+Alice reported the issue; scan-coverity CID 456 is recorded in the source report.
+
+## References
+https://github.com/owner/repo/commit/abcdef1234'''
+    notes = 'Filled missing credits and added related finding references.'
+    (root / 'reply').write_text(notes + '\nsummary: Revised\nseverity: high\n'
+                              'credits: alice:reporter\n---\n' + description + '\n')
+    for command, selection in [('new', 'abcdef1234'), ('review', 'GHSA-test')]:
+        result, _ = run(binary, root, args=['-r', 'owner/repo', command, selection])
+        assert result.returncode == 0, result.stdout
+        assert payload(root)['description'] == description
+        assert payload(root)['credits'] == [{'login': 'alice', 'type': 'reporter'}]
+        assert notes in (root / 'editor-buffer').read_text()
+        assert not saved_dir(result.stdout).exists()
+    (root / 'reply').write_text(REPLY)
+
     # A successful gh exit with unchanged server content must not claim a save.
     result, _ = run(binary, root, GH_DROP_SAVE='1')
     assert result.returncode != 0, result.stdout
