@@ -4,7 +4,7 @@ import os
 import json2
 import rand
 
-const agents = ['claude -p', 'codex exec -', 'pmai "\$(cat)"']
+const agents = ['claude -p', 'codex exec -', 'pmai "\$(cat)"', 'opencode run "\$(cat)"']
 
 const reply = 'Reply with brief notes (verdict, confidence, doubts), then the advisory as the
 last thing in your reply, in exactly this format and without code fences:\n\n${format}'

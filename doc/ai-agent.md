@@ -7,8 +7,9 @@ The agent is any command that reads the prompt on stdin. Set it with `GHAV_AI`.
 | `claude -p` | default |
 | `codex exec -` | |
 | `pmai "$(cat)"` | reads the prompt from the argument instead of stdin |
+| `opencode run "$(cat)"` | OpenCode noninteractive mode; passes the prompt as one argument |
 
-In the TUI, `A` cycles between these three presets.
+In the TUI, `A` cycles between these four presets.
 
 ## What the agent sees
 

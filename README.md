@@ -209,8 +209,14 @@ when `r2` is on `PATH`. Otherwise it opens in `$PAGER` (default: `less`). After 
 the viewer, the same `v`/`r`/`b`/`e` prompt lets you continue working on that advisory;
 press Enter alone to return to the list. Every view and AI review fetches it from GitHub.
 
-Agents: `claude -p` (default), `codex exec -`, `pmai` — anything that reads a prompt on
-stdin.
+Agents: `claude -p` (default), `codex exec -`, `pmai "$(cat)"`, and
+`opencode run "$(cat)"`. Press `A` in the TUI to cycle these presets, or set `GHAV_AI`
+to any command that reads a prompt on stdin. The `pmai` and OpenCode presets pass
+that input as a single quoted argument. For example:
+
+```sh
+GHAV_AI='opencode run "$(cat)"' ghav -r owner/repo
+```
 
 `new`, `edit` and `review` print a private recovery directory before editing or running
 the agent. The AI reply, original advisory, proposed version, diff and saved edits stay

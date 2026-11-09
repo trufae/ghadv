@@ -25,7 +25,7 @@ Environment:
   GHAV_GREP   git log -E --grep for fix commits (default: ##(crash|security))
   GHAV_LABEL  issues/PRs label (default: cve; includes open and closed items)
   GHAV_AI     agent command, prompt is piped to stdin (default: claude -p)
-              e.g. "codex exec -", \'pmai "\$(cat)"\''
+              e.g. "codex exec -", \'pmai "\$(cat)"\', \'opencode run "\$(cat)"\''
 
 fn issue_label(label string) string {
 	if label != '' {
