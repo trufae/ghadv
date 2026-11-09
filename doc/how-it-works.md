@@ -3,6 +3,12 @@
 `ghav` is a thin wrapper around the GitHub REST API plus a couple of local edits, all done
 through `gh api`.
 
+`ghadv.v` parses arguments and dispatches commands. The repository-scoped `GitHub`
+API in `github.v` owns all `gh` calls, endpoint paths, response queries and JSON
+serialization. `workflow.v` handles AI and editor review, `advisory.v` handles the
+editable format, and `sources.v` handles source URLs and local commits. `tui.v`
+provides terminal views and calls the same API and workflows as the CLI.
+
 | Operation | Endpoint |
 | --- | --- |
 | List / filter | `GET /repos/{owner}/{repo}/security-advisories` with optional `state` query |

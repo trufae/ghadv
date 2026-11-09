@@ -1,12 +1,12 @@
 PREFIX ?= $(HOME)/.local
 BINDIR ?= $(PREFIX)/bin
-SRC = ghadv.v
+SRC = $(filter-out %_test.v,$(wildcard *.v))
 BIN = ghadv
 
 all: $(BIN)
 
 $(BIN): $(SRC)
-	v -o $(BIN) $(SRC)
+	v -o $(BIN) .
 
 install: $(BIN)
 	mkdir -p $(BINDIR)

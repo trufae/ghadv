@@ -21,7 +21,7 @@ Short version of the reasoning behind the tool.
 ## Limitations
 
 - Focused source-URL and advisory-link tests run with `v test ghadv_test.v`. Build with
-  `v -o ghav ghadv.v`; use a stub `gh` on `PATH` when exercising API interactions.
+  `v -o ghav .`; use a stub `gh` on `PATH` when exercising API interactions.
 - The commit view only sees commits matching `GHAV_GREP` in the local checkout.
 - Advisory↔commit linking relies on 10–40 char hex ids appearing in the description.
 - Issue/PR linking requires a full GitHub URL in the advisory description. Source URLs

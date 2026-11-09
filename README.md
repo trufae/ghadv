@@ -35,13 +35,30 @@ Requires [V](https://vlang.io), `git` and an authenticated `gh` with
 
 ```sh
 git clone <this repo> && cd ghav
-make install          # builds and installs ghav into ~/.local/bin
+make BIN=ghav install # builds and installs ghav into ~/.local/bin
 ```
 
-Or build only: `make` (same as `v -o ghav ghadv.v`). `PREFIX` and `BINDIR` are overridable;
-`make uninstall` and `make clean` exist too.
+Or build only: `make` (defaults to `ghadv`), or `v -o ghav .` for the name used here.
+`BIN`, `PREFIX` and `BINDIR` are overridable; `make uninstall` and `make clean` exist too.
+Use the same `BIN` value when installing, uninstalling or cleaning. Compile the directory
+so V includes every source file.
 
 Run the focused URL parsing and advisory-link tests with `v test ghadv_test.v`.
+
+The source files share one V module:
+
+| File | Responsibility |
+| --- | --- |
+| `ghadv.v` | argument parsing, help and command dispatch |
+| `github.v` | repository-scoped `GitHub` API, `gh` requests, endpoints and JSON serialization |
+| `tui.v` | terminal views, row formatting, navigation and action prompts |
+| `workflow.v` | draft creation, AI review, editor handling and review diffs |
+| `advisory.v` | advisory types, editable format parsing and source linking |
+| `sources.v` | commit/issue/PR URL parsing and local fix-commit discovery |
+
+The CLI and workflows call methods such as `api.advisories(state)`,
+`api.create_advisory(advisory)` and `api.request_cve(id)`; GitHub endpoint paths and
+payload handling stay in `github.v`.
 
 ## Usage
 
