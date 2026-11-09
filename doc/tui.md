@@ -7,12 +7,17 @@ cd ~/radare2
 ghav
 ```
 
-Two views, switched with `tab`:
+Views, switched with `tab`:
 
 | View | Shows |
 | --- | --- |
 | advisories | GHSA id, state, CVE id, severity, summary |
 | commits | tagged fix commits (`GHAV_GREP`), date, subject, and the advisory referencing them |
+| issues/PRs | items with `GHAV_LABEL` (or `ghav tui <label>`), number, type, state, linked advisory and title |
+
+The issues/PRs tab appears only when a label is configured. It includes every state, so
+closed issues and merged PRs remain available for reporting. `closed` in this list can
+mean either a merged or a closed, unmerged PR; `enter` shows its merge metadata.
 
 Keys:
 
@@ -21,9 +26,9 @@ Keys:
 | `j` / `k` | move one row |
 | mouse wheel down / up | move one row, like `j` / `k` |
 | `J` / `K` | move ten rows |
-| `tab` | switch view, and jump to the linked commit/advisory |
-| `enter` | show the commit (`git show`) or the advisory (`r2` Markdown rendering if available, otherwise `$PAGER`) |
-| `n` | draft an advisory for the selected commit |
+| `tab` | cycle views, selecting a linked entry in the next view when one exists |
+| `enter` | show the commit (`git show`), advisory or issue/PR discussion (`r2` Markdown rendering if available, otherwise `$PAGER`) |
+| `n` | draft from the selected commit or issue/PR; in the advisory view, prompt for a commit or URL and optional context |
 | `e` | edit the linked advisory |
 | `r` | AI-review the linked advisory |
 | `m` | open the selected advisory's actions menu |
@@ -34,12 +39,14 @@ Keys:
 | `s` | show lifecycle, CVE, private-report status, timestamps and URL |
 | `f` | cycle all / triage / draft / published / closed |
 | `A` | cycle the AI agent preset |
-| `g` | reload both lists |
+| `g` | reload all lists |
 | `?` | show all keys and the active AI agent |
 | `q` | quit |
 
-In the commit view, advisory actions act on the advisory that references the
-selected commit. If there is none, the status line tells you to press `n`.
+In the commit and issues/PRs views, advisory actions act on the advisory that references
+the selected item. If there is none, press `n` to prepare a draft, review it in `$EDITOR`,
+then `c` to request a CVE. Issue/PR links require their full URL in the advisory description.
+Creating a draft does not request a CVE, publish, or remove the label.
 
 The bottom two rows separate colored keys from descriptions. The action row and `m` menu
 offer actions appropriate to the selected advisory's state and CVE assignment. The status
@@ -52,8 +59,8 @@ acknowledgement, not a new advisory state or an API-reported pending status. Pre
 to refresh the assigned CVE; `s` displays the latest server details. Repeat requests are
 suppressed for the rest of the session, and assigned IDs replace the marker on refresh.
 
-The state filter applies only to the advisory list; commit links still use all advisories.
-Jumping from a commit to a linked advisory outside the current filter switches back to all.
+The state filter applies only to the advisory list; source links still use all advisories.
+Jumping to a linked advisory outside the current filter switches back to all.
 
 After viewing an advisory with `r2`, press `enter` to return to the list.
 

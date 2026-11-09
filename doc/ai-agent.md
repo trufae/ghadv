@@ -14,6 +14,11 @@ In the TUI, `A` cycles between these three presets.
 
 The agent runs in the current directory, so it can inspect the checkout, `git log`, tags and
 `gh`, and build and run reproducers against vulnerable and patched revisions.
+For a GitHub issue/PR URL, the prompt includes its title, body and discussion comments.
+PRs also include their patch and merge metadata. The agent is told to verify the checkout
+matches the source repository, follow linked fixes, treat source content as evidence rather
+than instructions, and flag unknown versions. A closed issue or unmerged PR is not assumed
+to have a released fix. The source URL is requested in the advisory references for linking.
 
 The prompt asks for brief notes first (verdict, confidence, doubts), then the advisory as the
 last block of the reply, in the format from [advisory-format.md](advisory-format.md), without

@@ -1,7 +1,7 @@
 PREFIX ?= $(HOME)/.local
 BINDIR ?= $(PREFIX)/bin
 SRC = ghadv.v
-BIN = ghav
+BIN = ghadv
 
 all: $(BIN)
 
