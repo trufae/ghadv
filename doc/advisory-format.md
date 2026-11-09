@@ -45,12 +45,18 @@ with the reviewer notes above it. Editing the diff is the verdict:
 - edit a context line or a `+` line to reword it
 
 The diff (produced with `diff -U 99999`, labeled `advisory` and `review`) is applied back
-to the advisory and sent as a `PATCH`. An empty result aborts.
+to the advisory and sent as a `PATCH`. Leaving the diff unchanged accepts all proposed
+changes; emptying the file or producing the original advisory aborts. If the AI proposes
+no changes, its notes are shown without opening the editor. A successful update prints
+`Saved changes to <ghsa> on GitHub.`; the TUI's return prompt only returns to the list
+and does not apply anything itself.
 
 ## Recovery
 
 Before the AI or editor starts, `ghav` prints a private recovery directory and a command
-to resume it. Each attempt has its own directory. It contains:
+to resume it. If the AI fails or replies without an advisory, the error includes a preview
+of its captured reply and states that no changes were saved. Each attempt has its own
+directory. It contains:
 
 - `original.md`: the advisory before editing
 - `prompt.txt` and `reply.txt`: the AI prompt and raw output, including partial output

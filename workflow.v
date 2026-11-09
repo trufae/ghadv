@@ -58,9 +58,11 @@ fn resume_edit(dir string, run_ai bool) ! {
 			os.write_file(proposed, orig)!
 		} else {
 			if run_ai {
-				ask_ai(dir)!
+				ask_ai(dir) or { return ai_error(dir, err.msg()) }
 			}
-			notes, text := ai_reply(os.read_file(os.join_path(dir, 'reply.txt'))!)!
+			notes, text := ai_reply(os.read_file(os.join_path(dir, 'reply.txt'))!) or {
+				return ai_error(dir, err.msg())
+			}
 			head := if orig.starts_with('#') { orig.all_before('\n') + '\n' } else { '' }
 			os.write_file(os.join_path(dir, 'notes.txt'), notes)!
 			os.write_file(proposed, head + text)!
@@ -70,7 +72,13 @@ fn resume_edit(dir string, run_ai bool) ! {
 		path := os.join_path(dir, 'review.diff')
 		if !os.exists(path) {
 			notes := os.read_file(os.join_path(dir, 'notes.txt'))!
-			os.write_file(path, udiff(notes, orig, os.read_file(proposed)!)!)!
+			diff := udiff(notes, orig, os.read_file(proposed)!)!
+			os.write_file(path, diff)!
+			if diff == '' && !os.exists(os.join_path(dir, 'edit.md')) {
+				println(notes)
+				println('No review changes to apply; GitHub was not updated. Recovery files kept in ${dir}')
+				return
+			}
 		}
 	} else if !os.exists(os.join_path(dir, 'edit.md')) {
 		notes := if session.kind == 'new' {
@@ -80,10 +88,13 @@ fn resume_edit(dir string, run_ai bool) ! {
 		}
 		os.write_file(os.join_path(dir, 'edit.md'), notes + os.read_file(proposed)!)!
 	}
+	if session.kind == 'review' {
+		println('Review ready. Close the editor to apply the remaining changes; empty the file to abort.')
+	}
 	api := GitHub{ repo: session.repo }
 	for {
 		a := edit(dir, orig) or {
-			println('aborted; recovery files kept in ${dir}')
+			println('No changes saved to GitHub; recovery files kept in ${dir}')
 			return
 		}
 		if session.kind == 'new' {
@@ -99,6 +110,7 @@ fn resume_edit(dir string, run_ai bool) ! {
 				if retry_save(dir) { continue }
 				return err
 			}
+			println('Saved changes to ${session.id} on GitHub.')
 		}
 		// A resumed directory may also contain files the user added; leave those alone.
 		for name in ['session.json', 'prompt.txt', 'reply.txt', 'notes.txt', 'original.md',
@@ -128,6 +140,7 @@ fn edit(dir string, orig string) ?Adv {
 	mut open_editor := true
 	for {
 		if open_editor {
+			println('Opening ${os.file_name(path)} in ${os.getenv_opt('EDITOR') or { 'vi' }} ...')
 			code := sh('${os.getenv_opt('EDITOR') or { 'vi' }} "\$1"', path)
 			if code != 0 {
 				eprintln('Editor exited with status ${code}; saved work kept in ${dir}')
@@ -202,6 +215,14 @@ fn ask_ai(dir string) ! {
 	if code != 0 {
 		return error('agent exited with status ${code}; reply saved in ${of}')
 	}
+}
+
+// Agent errors often arrive on stdout, which is captured instead of shown live.
+fn ai_error(dir string, reason string) IError {
+	path := os.join_path(dir, 'reply.txt')
+	out := os.read_file(path) or { '' }
+	preview := if out.trim_space() == '' { '(empty reply)' } else { out#[..2000] }
+	return error('${reason}\nNo changes saved to GitHub. AI reply (${path}):\n${preview}')
 }
 
 fn ai_reply(out string) !(string, string) {

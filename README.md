@@ -98,6 +98,11 @@ move down/up one row in the active list.
 Press `r` to review the selected advisory. The optional extra-context prompt includes an
 example, such as "Check the affected versions and whether the fix addresses the root
 cause." Enter starts the review; Ctrl+C or Escape cancels and returns to the list.
+The proposed patch opens in `$EDITOR`; closing it accepts the remaining changes, even
+if you leave the diff unchanged. Empty the file to abort. A successful save prints
+`Saved changes to <ghsa> on GitHub.` before the return prompt, then the list reloads.
+If there are no changes, the review notes are shown without opening an empty diff.
+Failed AI replies are displayed with their recovery path and do not update GitHub.
 
 Press **`C`** on an advisory (or choose it from `m`) to manage credits. You can also open
 that screen directly with `ghav credits GHSA-xxxx-yyyy-zzzz`. Use `a` to add, `e` to edit,

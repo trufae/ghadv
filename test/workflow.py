@@ -37,9 +37,14 @@ if name == 'gh':
             (root / 'fail-api').unlink()
             print('HTTP 422: rejected advisory', file=sys.stderr)
             sys.exit(1)
+        if os.environ.get('GH_PERSIST'):
+            (root / 'saved.json').write_text(payload)
         print('GHSA-test')
     elif '--paginate' in args:
-        print('GHSA-test\\tdraft\\t-\\thigh\\tTest advisory\\t\\t')
+        summary = 'Test advisory'
+        if os.environ.get('GH_PERSIST') and (root / 'saved.json').exists():
+            summary = json.loads((root / 'saved.json').read_text())['summary']
+        print('GHSA-test\\tdraft\\t-\\thigh\\t' + summary + '\\t\\t')
     else:
         print((root / 'original').read_text(), end='')
 elif name == 'ai':
@@ -56,6 +61,7 @@ elif name == 'ai':
     sys.exit(int(os.environ.get('AI_EXIT', '0')))
 else:
     path = Path(sys.argv[1])
+    (root / 'editor-buffer').write_text(path.read_text())
     mode = os.environ.get('EDITOR_MODE', '')
     if mode == 'wait':
         subprocess.run(['stty', '-icanon', '-echo', '-opost'], check=True)
@@ -114,6 +120,25 @@ def payload(root):
 
 def tui_checks(binary, root):
     env = {'GHAV_AI': 'ai', 'EDITOR': 'editor', 'EDITOR_MODE': ''}
+    # Accepting the unchanged review diff must PATCH the AI version, report success,
+    # and reload the updated advisory before displaying the list again.
+    with Terminal(binary, root, 'tui', env | {'GH_PERSIST': '1'}, controlling=True) as ui:
+        ui.expect('Test advisory')
+        ui.send('r')
+        ui.expect('extra context (optional):')
+        ui.send('\n')
+        screen = ui.expect('Press Enter to return')
+        assert 'Opening review.diff in editor' in screen
+        assert 'Saved changes to GHSA-test on GitHub.' in screen
+        assert payload(root)['summary'] == 'Revised'
+        assert payload(root)['description'] == 'After'
+        assert '+summary: Revised' in (root / 'editor-buffer').read_text()
+        assert not saved_dir(screen.replace('\r', '')).exists()
+        ui.send('\n')
+        ui.expect('Revised')
+        ui.send('q')
+        ui.finish()
+
     before = (root / 'payload.json').read_text()
     writes = [line for line in (root / 'gh.calls').read_text().splitlines()
               if '--input' in json.loads(line)]
@@ -136,6 +161,24 @@ def tui_checks(binary, root):
         ui.finish()
     assert (root / 'ai.calls').read_text() == ai_calls
     assert set(root.glob('ghav-*')) == sessions
+
+    # A failed AI reply must be visible before returning, with no editor or PATCH.
+    (root / 'reply').write_text('Execution error')
+    (root / 'editor-buffer').unlink()
+    with Terminal(binary, root, 'tui', env, controlling=True) as ui:
+        ui.expect('C credits')
+        ui.send('r')
+        ui.expect('extra context (optional):')
+        ui.send('\n')
+        screen = ui.expect('Press Enter to return')
+        assert 'Execution error' in screen
+        assert 'No changes saved to GitHub.' in screen
+        assert 'Saved changes to' not in screen
+        assert not (root / 'editor-buffer').exists()
+        ui.send('\n')
+        ui.expect('C credits')
+        ui.send('q')
+        ui.finish()
 
     # Typed Ctrl+C during the AI returns to the list and preserves partial output.
     (root / 'reply').write_text('partial TUI analysis\n')
@@ -201,6 +244,26 @@ def tui_checks(binary, root):
 
 def checks(binary, root):
     setup(root)
+    result, _ = run(binary, root)
+    assert result.returncode == 0, result.stdout
+    assert payload(root)['summary'] == 'Revised'
+    assert payload(root)['description'] == 'After'
+    assert 'Saved changes to GHSA-test on GitHub.' in result.stdout
+    assert not saved_dir(result.stdout).exists()
+
+    # An unchanged advisory should show the AI notes and explain the lack of a PATCH.
+    before = (root / 'payload.json').read_text()
+    (root / 'reply').write_text('Verified: no changes needed\n' + ORIGINAL.split('\n', 1)[1])
+    (root / 'editor-buffer').unlink()
+    result, _ = run(binary, root)
+    assert result.returncode == 0, result.stdout
+    assert 'Verified: no changes needed' in result.stdout
+    assert 'No review changes to apply; GitHub was not updated.' in result.stdout
+    assert not (root / 'editor-buffer').exists()
+    assert (root / 'payload.json').read_text() == before
+    assert saved_dir(result.stdout).exists()
+    (root / 'reply').write_text(REPLY)
+
     for mode, choice, expected in [('broken', 'n', 'Revised'),
                                    ('invalid', 'n', 'Revised'),
                                    ('manual', 'm', 'Manual'),
@@ -246,6 +309,8 @@ def checks(binary, root):
         result, _ = run(binary, root, mode)
         assert saved_dir(result.stdout).exists()
         assert (root / 'payload.json').read_text() == before
+        assert 'No changes saved to GitHub' in result.stdout
+        assert 'Saved changes to' not in result.stdout
 
     # Ordinary edit/new share the recovery path and must retain their save behavior.
     before = (root / 'payload.json').read_text()
@@ -272,6 +337,9 @@ def checks(binary, root):
     # A nonzero AI exit must keep even a complete reply for a later resume.
     result, _ = run(binary, root, AI_EXIT='1')
     assert result.returncode != 0
+    assert 'No changes saved to GitHub.' in result.stdout
+    assert REPLY in result.stdout
+    assert 'Saved changes to' not in result.stdout
     directory = saved_dir(result.stdout)
     assert (directory / 'reply.txt').read_text() == REPLY
     result, env = run(binary, root, args=['resume', str(directory)])
