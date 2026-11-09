@@ -13,6 +13,8 @@ s: advisory status; m: actions menu; f/F: next/previous advisory state filter
 g: reload; A: cycle AI agent
 ?: this help; q or Ctrl+C: quit
 
+Severity: 🔴 critical, 🟠 high, 🟡 medium, 🟢 low, ⚪ unknown.
+Commit circles use linked advisory severity or a keyword estimate from the subject.
 States: triage (private report), draft, published, closed.
 CVE assignment is separate from the advisory state and happens asynchronously.
 Use s to check the assigned CVE; GitHub REST does not expose pending requests.
@@ -31,13 +33,28 @@ fn color(state string, s string) string {
 	}
 }
 
+fn severity_icon(severity string) string {
+	return match severity.to_lower() {
+		'critical' { '🔴' }
+		'high' { '🟠' }
+		'medium', 'moderate' { '🟡' }
+		'low' { '🟢' }
+		else { '⚪' }
+	}
+}
+
 fn crow(c []string, advs [][]string, w int) string {
 	if c.len < 3 {
 		return c.join(' ')
 	}
 	i := adv_of(advs, c[0])
 	mark := if i < 0 { term.dim('${'-':-20}') } else { color(advs[i][1], '${advs[i][0]:-20}') }
-	return '${c[0][..10]} ${c[1]} ${mark} ${c[2]#[..w - 44]}'
+	severity := if i >= 0 && severity_icon(advs[i][3]) != '⚪' {
+		advs[i][3]
+	} else {
+		commit_severity(c[2])
+	}
+	return '${severity_icon(severity)} ${c[0][..10]} ${c[1]} ${mark} ${c[2]#[..w - 47]}'
 }
 
 fn irow(item []string, advs [][]string, w int) string {
@@ -53,7 +70,7 @@ fn row(r []string, w int) string {
 	if r.len < 5 {
 		return r.join(' ')
 	}
-	return '${r[0]:-20} ${color(r[1], '${r[1]:-10}')} ${r[2]:-15} ${r[3]:-9} ${r[4]#[..w - 59]}'
+	return '${severity_icon(r[3])} ${r[0]:-20} ${color(r[1], '${r[1]:-10}')} ${r[2]:-15} ${r[3]:-9} ${r[4]#[..w - 62]}'
 }
 
 // Suggested actions depend on the advisory lifecycle, independently of CVE assignment.
@@ -549,9 +566,9 @@ fn tui(api GitHub, label string) {
 		}
 		header := 'ghav ${api.repo} | ' + tabs.map(if it == tabs[view] { '[${it}]' } else { it }).join(' | ')
 		columns := if view == 0 {
-			'${'ADVISORY':-20} ${'STATE':-10} ${'CVE':-15} ${'SEVERITY':-9} SUMMARY'
+			'   ${'ADVISORY':-20} ${'STATE':-10} ${'CVE':-15} ${'SEVERITY':-9} SUMMARY'
 		} else if view == 1 {
-			'${'COMMIT':-10} ${'DATE':-10} ${'ADVISORY':-20} SUBJECT'
+			'   ${'COMMIT':-10} ${'DATE':-10} ${'ADVISORY':-20} SUBJECT'
 		} else {
 			'${'NUMBER':-8} ${'TYPE':-5} ${'STATE':-7} ${'ADVISORY':-20} TITLE'
 		}

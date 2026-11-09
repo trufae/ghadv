@@ -51,3 +51,37 @@ fn commits() ![][]string {
 	}
 	return r.output.split_into_lines().filter(it != '').map(it.split('\t'))
 }
+
+// Rough display-only ratings from radare2 ##crash subjects, strongest match first.
+fn commit_severity(subject string) string {
+	message := subject.to_lower().replace('##crash', '').replace('##security', '')
+	text := ' ' + message.bytes().map(if it.is_alnum() { it } else { u8(` `) }).bytestr()
+		.fields().join(' ') + ' '
+	for severity in ['critical', 'high', 'medium', 'low'] {
+		keywords := match severity {
+			'critical' {
+				['rce', 'remote code execution', 'arbitrary code execution', 'command injection',
+					'cmdinj', 'shell injection', 'script injection', 'sandbox escape', 'sandbox bypass']
+			}
+			'high' {
+				['uaf', 'use after free', 'double free', 'type confusion', 'type confussion',
+					'format string', 'heap overflow', 'stack overflow', 'buffer overflow',
+					'oobwrite', 'oob write', 'out of bounds write', 'memory corruption', 'arbitrary write']
+			}
+			'medium' {
+				['oobread', 'oob read', 'out of bounds read', 'overread', 'over read', 'underread',
+					'under read', 'invalid read', 'invalid memory read', 'integer overflow', 'int overflow',
+					'intovf', 'wraparound', 'memory disclosure', 'uninitialized memory', 'memory exhaustion',
+					'excessive memory', 'exhaust memory', 'stack exhaustion', 'exhaust the stack',
+					'infinite loop', 'infinite recursion', 'unbounded recursion', 'unbound recursion',
+					'nesting depth', 'hang', 'hanging', 'division by zero', 'divisions by zero', 'divby0',
+					'zipbomb', 'xzbomb', 'decompression bomb', 'denial of service', 'dos']
+			}
+			else { ['null', 'nullptr', 'segfault', 'crash', 'leak', 'assertion'] }
+		}
+		if keywords.any(text.contains(' ${it} ') || text.contains(' ${it}s ')) {
+			return severity
+		}
+	}
+	return ''
+}

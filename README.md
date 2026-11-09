@@ -99,6 +99,16 @@ and `f`/`F` to cycle the state filter forward/backward. Two rows of colored shor
 navigation and the actions available for the selection; `?` shows all keys. Use `j`/`k`
 or the mouse wheel to move down/up one row in the active list.
 
+Advisory and commit lists (also `ls` and `log`) show severity circles:
+🔴 critical, 🟠 high, 🟡 medium, 🟢 low, and ⚪ unknown. Commits use a linked advisory's
+severity when available; otherwise, a case-insensitive keyword estimate from the subject.
+The hardcoded keywords come from radare2 `##crash` commits: command/shell injection and
+sandbox escapes rank critical; UAF, double free, type confusion and buffer overflows rank
+high; over-reads, integer overflow and resource exhaustion rank medium; null dereferences,
+segfaults and leaks rank low. The strongest matching category wins. Tags alone do not set
+severity, and unmatched subjects stay unknown. These estimates only affect display;
+they do not set advisory severity or CVSS scores.
+
 Press `/` to filter the current list by text, ignoring case. Enter applies the query;
 an empty query clears it, and Escape or Ctrl+C cancels. Each tab keeps its own text filter,
 which matches row data such as titles, IDs and linked advisories. Advisory text and state
