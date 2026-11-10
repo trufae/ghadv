@@ -1,43 +1,48 @@
 # Usage
 
-`ghadv` is a CLI with an interactive TUI mode on top of it.
+`ghadv` is a CLI with an interactive TUI mode on top of it. GitHub uses native repository
+advisories; GitLab uses labeled disclosure issues. See [GitLab support](gitlab.md) for
+its workflow and platform differences. `<id>` means `GHSA-…` on GitHub or `GL-123` on GitLab.
 
 ```
-ghadv [-r owner/repo] [command] [args]
-
-  tui [label]             advisory, commit and labeled issues/PRs tabs (default)
-  ls [state]              list all/triage/draft/published/closed advisories
-  log                    list tagged fix commits and their advisories
-  issues [label]          list labeled issues/PRs (default: GHADV_LABEL or cve)
-  new <commit|url> [context] analyze a commit, issue or PR with AI and create a draft
-  show <ghsa>             print advisory
-  status <ghsa>           show lifecycle, CVE and private report details
-  credits <ghsa>          manage credited people and roles in the TUI
-  edit <ghsa>             edit advisory in $EDITOR
-  review <ghsa> [context] let the AI review/rewrite it, then edit
-  similar <ghsa|commit|url> [context] find similar bugs using the selection as a template
-  resume <directory>     continue saved work without running the AI again
-  cve <ghsa>              request a CVE id (asynchronous)
-  approve <ghsa>          alias for cve
-  draft <ghsa>            accept a report or reopen as a draft
-  publish <ghsa>          publish the advisory
-  close <ghsa>            close (reject) the advisory
-  invalid <ghsa|commit|url> [reason] show a local tag, or mark invalid with a reason
-  unmark <ghsa|commit|url> remove its local invalid tag
+ghadv [-r namespace/repo|url] [--provider github|gitlab] [--host hostname] [--remote name] [command] [args]
+  tui [label]              advisory, commit and labeled issues/PRs tabs (default)
+  ls [state]               GitHub advisories or GitLab disclosure issues (opened/closed)
+  log                     list tagged fix commits and their advisories
+  issues [label]           list labeled issues/PRs (default: GHADV_LABEL or cve)
+  new <commit|url> [context] analyze a commit, issue or PR/MR with AI and create a draft
+  show <id>               print advisory
+  status <id>             show lifecycle, CVE and private report details
+  credits <id>            manage credited people and roles in the TUI
+  edit <id>               edit advisory in $EDITOR
+  review <id> [context]   let the AI review/rewrite it, then edit
+  similar <id|commit|url> [context] find similar bugs using the selection as a template
+  resume <directory>       continue saved work without running the AI again
+  cve <id>                 GitHub: request CVE; GitLab: show CVE request instructions
+  approve <id>            alias for cve
+  draft <id>              accept a report or reopen as a draft
+  publish <id>            publish the advisory
+  close <id>               close the advisory/disclosure
+  reopen <id>              reopen a closed advisory/disclosure
+  invalid <id|commit|url> [reason] show its local tag, or mark invalid with a reason
+  unmark <id|commit|url>  remove its local invalid tag
+GitLab disclosure IDs use GL-<issue number>; publish/draft/credits are GitHub-only.
 ```
 
-`-h`, `--help` or `help` prints the same text.
+`-h`, `--help` or `help` prints command help. Global options go before the command.
+`draft`, `publish` and structured `credits` are GitHub-only.
 
 ## Repository
 
-The repository is resolved in this order:
+A repository/source URL identifies its host and project; explicit settings must agree.
+For a checkout, detection selects `--remote`, the current branch's upstream remote,
+`origin`, or a sole remaining remote. Unknown custom hosts require `--provider`.
+`-r` overrides `GHADV_REPO`; a bare project path uses the selected provider/host or
+inherits the checkout's identity. Outside a checkout, a bare path defaults to GitHub.
+A GitLab source URL can also select the repository without `-r`.
 
-1. `-r owner/repo`
-2. `$GHADV_REPO`
-3. The GitHub URL for `new`, `similar`, `invalid` or `unmark` (must match an explicit repository above)
-4. `gh repo view --json nameWithOwner` in the current directory
-
-If none works, `ghadv` exits with `cannot find repository, use -r owner/repo or GHADV_REPO`.
+See [repository selection and custom hosts](gitlab.md#setup-and-repository-selection)
+for complete examples and the `GHADV_*` overrides.
 
 ## Typical flow
 
@@ -54,8 +59,11 @@ ghadv publish GHSA-xxxx-yyyy-zzzz              # goes public
 
 ### ls
 
-Lists the advisories of the repository: GHSA id, state, CVE id, severity and summary.
-An optional state filters the results: `ghadv ls triage`, `ghadv ls draft`,
+Lists GitHub advisories: GHSA id, state, CVE id, severity and summary.
+For GitLab, lists disclosure issues labeled `GHADV_ADVISORY_LABEL`, with `GL-` IDs,
+CVE references and separate confidentiality indicators. GitLab filters are `all`,
+`opened` and `closed`; see [GitLab disclosure issues](gitlab.md#disclosure-issues).
+On GitHub, an optional state filters the results: `ghadv ls triage`, `ghadv ls draft`,
 `ghadv ls published`, or `ghadv ls closed`. Omitting it, or using `all`, lists every state.
 
 ### log
@@ -74,13 +82,16 @@ ghadv log
 
 `ghadv new <commit|url> [context]` sends the source and your optional context to the AI
 agent, opens the resulting advisory in `$EDITOR`, and creates a draft when you save.
-Empty the editor buffer to abort. Supported URLs are HTTPS `github.com` URLs with paths
-`owner/repo/issues/123`, `owner/repo/pull/456`, or `owner/repo/commit/sha`.
+Empty the editor buffer to abort. GitHub source paths are `owner/repo/issues/123`,
+`owner/repo/pull/456`, or `owner/repo/commit/sha`. GitLab paths are
+`group/subgroup/project/-/issues/123`, `/-/merge_requests/456`, or `/-/commit/sha`.
+Use HTTPS URLs; custom hosts need an explicit provider. GitLab creation saves a
+confidential issue labeled `GHADV_ADVISORY_LABEL`.
 Query strings and fragments are stripped from source references.
 
-Issues supply their body and discussion comments; PRs also supply merge metadata and a
+Issues supply their body and discussion comments; PRs/MRs also supply merge metadata and a
 patch. The agent investigates linked fixes and flags unknown versions. Draft creation
-does not request a CVE or publish; run `cve <ghsa>` after reviewing the draft.
+does not request a CVE or publish; run `cve <id>` after reviewing the draft.
 
 ### issues / tui label
 
@@ -91,25 +102,25 @@ ghadv -r owner/repo tui "needs-cve"
 ```
 
 Both commands accept an optional label, defaulting to `GHADV_LABEL` or `cve` when unset
-or empty. The TUI always includes the third issues/PRs tab. Items are fetched across
-all pages and states, including closed issues and merged PRs. The list shows any advisory
+or empty. The TUI always includes the third issues/PRs or issues/MRs tab. Items are fetched across
+all pages and states, including closed issues and merged PRs/MRs. The list shows any advisory
 referencing each item's URL. Press `n` in that tab to draft from the selected item.
 The label is not removed after draft creation or CVE requests.
 
 ### show / edit
 
 `show` prints the advisory in the text format. `edit` opens it in `$EDITOR` and sends a
-`PATCH` on save.
+GitHub `PATCH` or GitLab issue `PUT` on save, followed by reloading and checking the fields.
 
 ### review
 
-`ghadv review <ghsa> [context]` asks the agent to critique and rewrite the advisory, then
+`ghadv review <id> [context]` asks the agent to critique and rewrite the advisory, then
 opens a diff for you to accept or reject line by line. See [the advisory](advisory-format.md)
 for the diff rules.
 
 ### similar
 
-`ghadv similar <ghsa|commit|url> [context]` asks the agent to find other bugs with the same
+`ghadv similar <id|commit|url> [context]` asks the agent to find other bugs with the same
 root cause as the selected advisory or source. It includes an advisory referencing the
 commit or issue/PR when available, and lists existing advisories for duplicate checking.
 The agent investigates the current checkout and returns a Markdown findings report with
@@ -122,7 +133,7 @@ the same workflow. See [the search prompt](ai-agent.md#finding-similar-bugs).
 
 ### credits
 
-`ghadv credits <ghsa>` opens the credits TUI without running an AI agent. Add, edit or
+`ghadv credits <id>` opens the credits TUI without running an AI agent. Add, edit or
 delete username/role entries and browse the full role list with `?`. Press `s` to save
 only the credits field. You can also reach this screen with `C` from the main TUI or
 its actions menu. See [credits controls and roles](tui.md#credits-screen).
@@ -140,21 +151,25 @@ running the AI or updating GitHub. Reports remain in the recovery directory afte
 
 ### cve / approve
 
-`ghadv cve <ghsa>` requests a CVE for the existing advisory, including an already published
+On GitLab, these commands show the disclosure URL and instructions for the separate
+CVE request process. They do not submit a request or save an accepted-request receipt.
+The following asynchronous API workflow applies to GitHub.
+
+`ghadv cve <id>` requests a CVE for the existing advisory, including an already published
 advisory. It does not publish, unpublish, or otherwise change the advisory's state.
 `approve` remains an alias. If a CVE is already assigned, the command prints it without
 submitting another request.
 
-GitHub accepts the request asynchronously. Check `ghadv status <ghsa>` or `ghadv ls` later.
+GitHub accepts the request asynchronously. Check `ghadv status <id>` or `ghadv ls` later.
 A missing CVE ID alone does not tell you whether a request is pending: the REST response
 does not expose that information. Successful requests from the CLI or TUI are saved
-locally and shown as `requested*` in lists across restarts. `ghadv status <ghsa>` shows
+locally and shown as `requested*` in lists across restarts. `ghadv status <id>` shows
 the recorded acceptance time until a CVE is assigned. This records an accepted request,
 not its current position or status in GitHub's queue. See
 [local record storage](configuration.md#local-cve-request-records).
 
-The TUI suppresses repeat requests with a saved record. An explicit `ghadv cve <ghsa>`
-or `ghadv approve <ghsa>` still allows a retry when no CVE has been assigned.
+The TUI suppresses repeat requests with a saved record. An explicit `ghadv cve <id>`
+or `ghadv approve <id>` still allows a retry when no CVE has been assigned.
 
 The equivalent direct command is:
 
@@ -167,13 +182,16 @@ access. See the [GitHub CVE request endpoint](https://docs.github.com/en/rest/se
 
 ### status
 
-`ghadv status <ghsa>` shows the advisory state, assigned CVE, private-report acceptance,
+On GitLab, this shows the native issue state, confidentiality, referenced CVEs, timestamps
+and URL. CVE references in text are not verification of assignment or publication.
+
+On GitHub, `ghadv status <id>` shows the advisory state, assigned CVE, private-report acceptance,
 timestamps (including withdrawal), private fork, and GitHub URL. Withdrawal is metadata,
 not an additional state that this CLI can set.
 
 ### invalid / unmark
 
-Record a local triage decision for an advisory, commit, issue or PR:
+Record a local triage decision for an advisory/disclosure, commit, issue or PR/MR:
 
 ```sh
 ghadv invalid GHSA-xxxx-yyyy-zzzz "No tagged release shipped vulnerable code"
@@ -191,19 +209,23 @@ works outside a checkout. URL query strings and fragments are ignored.
 The CLI lists and TUI show `[invalid]`. In the TUI, `i` adds or edits the reason, `I`
 clears it, and `/` searches `invalid` or words in the reason. Tagged items remain visible.
 Marking a commit or issue does not implicitly mark its linked advisory, or vice versa.
-Tags persist per GitHub host and repository on this machine; they are not shared with
+On GitLab, `GL-123` and its issue URL identify the same tag.
+Tags persist per provider, host and repository on this machine; they are not shared with
 collaborators. See [storage](configuration.md#local-invalid-tags).
 
 GitHub advisories have no native `invalid` state or custom labels. To keep the decision
-upstream, use `ghadv edit <ghsa>` to explain why no released version is affected, then
-`ghadv close <ghsa>` for an unpublished advisory/report. The local tag does not close
+upstream, use `ghadv edit <id>` to explain why no released version is affected, then
+`ghadv close <id>` for an unpublished advisory/report. The local tag does not close
 an advisory, change issue/PR labels, publish anything, or reject an assigned CVE.
 GitHub's supported fields are listed in the
 [advisory API](https://docs.github.com/en/rest/security-advisories/repository-advisories#update-a-repository-security-advisory).
 
-### draft / publish / close
+### draft / publish / close / reopen
 
-All three ask for confirmation. `draft` sets the advisory to draft, allowing a private
+On GitLab, only `close` and `reopen` are supported; they preserve confidentiality.
+On GitHub, `reopen` is an alias for changing the state to draft.
+
+All lifecycle changes ask for confirmation. On GitHub, `draft` sets the advisory to draft, allowing a private
 report in triage to be accepted or a closed advisory to be reopened. GitHub validates
 state transitions. `publish` makes the advisory public; `close` closes an unpublished
 advisory or rejects a report.

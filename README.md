@@ -3,8 +3,8 @@
 Manage GitHub security advisories and GitLab disclosure issues from the command line.
 Written in [V](https://vlang.io).
 
-Turn a fix commit, issue or pull request into a published advisory — an AI agent does the
-reconstruction, you keep the last word.
+Turn a fix commit, issue or pull/merge request into a reviewed security disclosure.
+An AI agent does the reconstruction; you keep the last word.
 
 ```sh
 $ cd ~/radare2
@@ -13,16 +13,16 @@ $ ghadv new 8f3a2c1 found by fuzzing the PDB parser
 
 ## What it does
 
-- Lists advisories, local fix commits, and labeled issues/PRs.
-- Drafts an advisory from a commit or GitHub issue/PR URL: the agent reads the report,
+- Lists advisories/disclosures, local fix commits, and labeled issues/PRs/MRs.
+- Drafts an advisory from a commit or GitHub/GitLab issue/PR/MR URL: the agent reads the report,
   discussion, patch, history and tags, then writes root cause, CWE, CVSS and versions.
   Evidence, caveats and related finding references belong in the advisory text.
   Drafting and review fill missing credits from verified sources and preserve names and scan IDs
   in Acknowledgements when they cannot be represented as GitHub credits.
 - Reviews existing advisories with the agent as a diff you accept or reject line by line.
 - Finds similar bugs using an advisory, CVE or fix commit as a template for an AI search.
-- Manages credits (finders, reporters, fix authors, ...) in a TUI screen.
-- Requests CVEs, accepts private reports, publishes and closes advisories. TUI actions confirm.
+- On GitHub, manages credits (finders, reporters, fix authors, ...) in a TUI screen.
+- On GitHub, requests CVEs, accepts private reports, publishes and closes advisories. TUI actions confirm.
 - Saves accepted CVE requests locally, preserving `requested*` across restarts until a CVE is assigned.
 - Tags individual advisories, commits and issues/PRs as invalid locally, with a reason and undo.
 
@@ -36,12 +36,14 @@ GitHub's advisory publishing endpoint, so `publish`, `draft` and structured `cre
 remain GitHub-only. GitLab Ultimate vulnerability reports are not required or queried.
 Custom servers use `--provider gitlab -r https://code.example/group/project`.
 Use `--remote name` to choose another Git remote. The `ghadv` command and existing
-`GHADV_*` settings remain supported.
+`GHADV_*` settings remain supported. See the [GitLab guide](doc/gitlab.md) for setup,
+state/visibility differences, CVE tracking and limitations.
 
 ## Install
 
-Requires [V](https://vlang.io), `git`, and an authenticated `gh` with
-**Repository security advisories: write** permission.
+Requires [V](https://vlang.io), `git`, and the authenticated CLI for your provider:
+`gh` with **Repository security advisories: write** for GitHub, or `glab` with access
+to the project issues for GitLab. GitLab Ultimate is not required.
 
 ```sh
 git clone <this repo> && cd ghadv
@@ -55,11 +57,11 @@ value for install, uninstall and clean.
 ## Usage
 
 ```sh
-ghadv [-r owner/repo] [command] [args]
+ghadv [-r namespace/repo|url] [--provider github|gitlab] [--host hostname] [--remote name] [command] [args]
 ```
 
-Run `ghadv` with no arguments for the TUI (advisory, commit and labeled issues/PRs tabs).
-The screen opens immediately while repository detection, GitHub lists and local Git
+Run `ghadv` with no arguments for the TUI (advisory/disclosure, commit and labeled issues/PRs/MRs tabs).
+The screen opens immediately while repository detection, remote lists and local Git
 details load in background threads. Each tab becomes usable as its data arrives;
 navigation and quitting stay responsive during loading and reloads. Reload failures
 keep the previous list. Searches, advisory links and formatted rows are cached, so
@@ -77,27 +79,28 @@ Key commands:
 | Command | What |
 | --- | --- |
 | `tui [label]` | interactive TUI (default) |
-| `ls [state]` | list advisories |
+| `ls [state]` | list advisories or GitLab disclosure issues |
 | `log` | list fix commits and their advisories |
-| `issues [label]` | list labeled issues/PRs |
+| `issues [label]` | list labeled issues/PRs/MRs |
 | `new <commit\|url> [context]` | analyze and create a draft |
-| `show <ghsa>` | print an advisory |
-| `status <ghsa>` | lifecycle, CVE and report details |
-| `credits <ghsa>` | manage credits in the TUI |
-| `edit <ghsa>` | edit in `$EDITOR` |
-| `review <ghsa> [context]` | AI review, then edit |
-| `similar <ghsa\|commit\|url> [context]` | find similar bugs |
+| `show <id>` | print an advisory |
+| `status <id>` | lifecycle, CVE and report details |
+| `credits <id>` | manage GitHub credits in the TUI |
+| `edit <id>` | edit in `$EDITOR` |
+| `review <id> [context]` | AI review, then edit |
+| `similar <id\|commit\|url> [context]` | find similar bugs |
 | `resume <dir>` | continue saved work |
-| `cve <ghsa>` | request a CVE id |
-| `draft/publish/close <ghsa>` | change state |
-| `invalid <ghsa\|commit\|url> [reason]` | show a local invalid tag, or set it with a reason |
-| `unmark <ghsa\|commit\|url>` | remove a local invalid tag |
+| `cve <id>` | request a GitHub CVE or show GitLab request instructions |
+| `close/reopen <id>` | close or reopen an advisory/disclosure |
+| `draft/publish <id>` | change GitHub advisory state |
+| `invalid <id\|commit\|url> [reason]` | show a local invalid tag, or set it with a reason |
+| `unmark <id\|commit\|url>` | remove a local invalid tag |
 
 For example, `ghadv invalid GHSA-xxxx-yyyy-zzzz "No tagged release shipped vulnerable code"`
 records a local triage decision. In the TUI, `i` marks the selected item or edits its reason,
 and `I` removes the tag. Lists show `[invalid]`; `/` searches both the tag and its reason.
 Tags survive restarts and apply only to the selected item, independently of linked items.
-They do not change GitHub. To record an advisory decision upstream, use `edit` to explain
+They do not change GitHub or GitLab. To record an advisory decision upstream, use `edit` to explain
 the finding in its description, then `close` to reject an unpublished advisory/report.
 See [invalid tags](doc/usage.md#invalid--unmark).
 
@@ -111,6 +114,7 @@ and `$PAGER`. See [doc/configuration.md](doc/configuration.md).
 
 | Page | Content |
 | --- | --- |
+| [doc/gitlab.md](doc/gitlab.md) | GitLab setup, disclosures, CVEs and limitations |
 | [doc/usage.md](doc/usage.md) | every command and a typical end-to-end flow |
 | [doc/tui.md](doc/tui.md) | views and all keybindings |
 | [doc/advisory-format.md](doc/advisory-format.md) | the text format and the review diff rules |

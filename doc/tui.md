@@ -1,6 +1,7 @@
 # TUI
 
-Running `ghadv` with no command opens the TUI.
+Running `ghadv` with no command opens the TUI. The header identifies the provider, host
+and project. GitLab uses a disclosures tab and an issues/MRs tab; see [GitLab support](gitlab.md).
 
 ```sh
 cd ~/radare2
@@ -18,6 +19,15 @@ Views, switched forward with `tab` and backward with `shift-tab`:
 The issues/PRs tab is always available and shows its label in the header. It includes every state, so
 closed issues and merged PRs remain available for reporting. `closed` in this list can
 mean either a merged or a closed, unmerged PR; `enter` shows its merge metadata.
+
+For GitLab, the disclosure tab lists `security-advisory` issues (configurable with
+`GHADV_ADVISORY_LABEL`). Rows show the native `opened`/`closed` state and a separate
+`[confidential]`/`[public]` indicator. `f`/`F` cycle all/opened/closed, `d` reopens,
+`x` closes, and `c`/`a` opens CVE request instructions without submitting a request.
+Editing, closing and reopening preserve visibility. `p`/publish and draft transitions
+are unavailable; `C` explains how to edit attribution in the disclosure text.
+The action menu and help adapt to the provider. The table below describes GitHub keys
+unless a shared action is specified.
 
 Keys:
 
@@ -48,7 +58,7 @@ Keys:
 | `?` | show all keys and the active AI agent |
 | `q` / `Ctrl+C` | quit from the main list |
 
-Startup and `g` load advisories, commits, labeled issues/PRs and Git status in background
+Startup and `g` load advisories/disclosures, commits, labeled issues/PRs/MRs and Git status in background
 threads. The screen opens before these requests complete; tabs show `loading...` until
 their first result arrives. You can navigate available lists, switch tabs, filter or quit
 while other requests run. Results appear automatically. A reload keeps the existing data
@@ -70,7 +80,8 @@ Local invalid tags apply only to the selected item. Press `i`, enter a reason su
 cancels. An empty reason is rejected. Tagged rows show `[invalid]`, the status line shows
 the reason, and the actions menu wraps long reasons. Press `I` to remove the tag. The
 `/` filter also searches `invalid` and the reason. Tags survive restarts; `g` reloads tags
-changed by another ghadv process. They leave GitHub state and linked items unchanged.
+changed by another ghadv process. They leave GitHub/GitLab state and linked items unchanged. On GitLab, a disclosure ID
+and its issue URL identify the same tag, including when selected in different tabs.
 
 `b` also works on commits and issues/PRs without a linked advisory. It prompts for optional
 search instructions, such as "Look for the same missing bounds check in related parsers

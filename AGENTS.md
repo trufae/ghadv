@@ -1,9 +1,13 @@
 # Project guidance
 
-This is a small V CLI/TUI for managing GitHub repository security advisories.
+This is a small V CLI/TUI for managing GitHub repository security advisories and
+GitLab disclosures stored as confidential labeled issues.
 
 - `ghadv.v` contains argument parsing, help and command dispatch.
-- `github.v` owns the repository-scoped `GitHub` API and all `gh` requests.
+- `repository.v` owns provider/host/project identity and remote detection;
+  `provider.v` dispatches repository operations and exposes supported actions.
+- `github.v` owns GitHub endpoints and all `gh` requests; `gitlab.v` owns
+  GitLab endpoints, disclosure serialization and all `glab` requests.
 - `tui.v` contains terminal views, formatting, navigation and action prompts.
 - `workflow.v` handles AI, editor and advisory review workflows; `advisory.v`
   defines the advisory types, editable format parser and source linking.
@@ -18,11 +22,12 @@ This is a small V CLI/TUI for managing GitHub repository security advisories.
 
 - Keep changes focused and follow the existing V style. Prefer standard-library
   APIs and the existing helpers over new dependencies or abstractions.
-- Use `gh` for GitHub authentication and API requests. Pass arguments as arrays;
+- Use `gh` for GitHub and `glab` for GitLab authentication and API requests. Pass arguments as arrays;
   reserve shell execution for intentionally configurable commands such as
   `$EDITOR` and `GHADV_AI`.
-- Keep GitHub endpoints and payload handling in `github.v`; CLI, TUI and workflow
-  code should call its repository-scoped methods.
+- Keep endpoints and payload handling in the provider's file; CLI, TUI and workflow
+  code should call the repository-scoped methods. Keep GitLab issue state and visibility
+  separate; editing, closing or reopening must not change confidentiality.
 - Preserve the editable advisory format, abort behavior, and review workflow.
 - Update the README when changing commands, configuration, or user-visible behavior.
 
@@ -41,3 +46,6 @@ Run the focused source parsing and linking tests with `v test ghadv_test.v`.
 For behavior changes, use focused checks or tests covering the affected logic.
 Use a stub `gh` executable on `PATH`
 when testing API interactions; routine validation should not mutate real advisories.
+`v test .` also covers provider identity, GitLab formatting, recovery and TUI behavior.
+Run `python3 test/gitlab_smoke.py /path/to/temporary/ghadv` for offline end-to-end checks
+with stub `gh` and `glab` executables, including a POSIX pseudo-terminal smoke test.
