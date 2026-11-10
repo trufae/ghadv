@@ -5,41 +5,59 @@ import net.urllib
 
 struct Source {
 	repo string
-	kind string // commit, issues or pull
+	kind string // commit, issues, pull or merge_requests
 	ref  string
 	url  string
+	provider string = 'github'
+	host string = 'github.com'
 }
 
-// URLs select their repository unless an explicit repository was supplied.
+// Compatibility helper for callers that only supply a GitHub repository path.
 fn source(repo string, input string) !Source {
-	if !input.contains('://') {
-		if input == '' || input.contains_any('?#') {
-			return error('expected a commit or a GitHub issue/PR URL')
-		}
-		return Source{repo, 'commit', input, 'https://github.com/${repo}/commit/${input}'}
+	if repo == '' && input.contains('://') {
+		return source_url(input, 'github', 'github.com')
 	}
+	return Repository{repo: repo}.source(input)
+}
+
+fn source_url(input string, provider string, host string) !Source {
 	u := urllib.parse(input)!
+	if u.scheme != 'https' { return error('expected an HTTPS source URL') }
 	parts := u.path.trim('/').split('/')
-	auth := u.user or { urllib.Userinfo{} }
-	if u.scheme != 'https' || u.host.to_lower() != 'github.com' || auth.username != '' || auth.password_set
-		|| parts.len != 4 || parts[2] !in ['issues', 'pull', 'commit'] {
-		return error('expected https://github.com/owner/repo/issues/number, /pull/number or /commit/sha')
+	if parts.len < 4 { return error('expected a commit, issue or pull/merge request URL') }
+	kind, ref := parts[parts.len - 2], parts.last()
+	is_gitlab := parts.len >= 5 && parts[parts.len - 3] == '-'
+	if (is_gitlab && kind !in ['commit', 'issues', 'merge_requests'])
+		|| (!is_gitlab && kind !in ['commit', 'issues', 'pull']) {
+		return error('unsupported source URL')
 	}
-	for part in parts[..2] {
-		if part in ['', '.', '..'] || !part.bytes().all(it.is_alnum() || it in [`-`, `_`, `.`]) {
-			return error('invalid repository in URL')
+	end := parts.len - if is_gitlab { 3 } else { 2 }
+	// Keep credentials in this validation URL so repository_location rejects them.
+	base := input.all_before('?').all_before('#').trim_right('/')
+	path := base[..base.len - (parts[end..].join('/').len + 1)]
+	location := repository_location(path, provider, host)!
+	if is_gitlab != (location.provider == 'gitlab') { return error('source URL does not match provider') }
+	if ref == '' || (kind == 'commit' && !ref.bytes().all(it.is_hex_digit()))
+		|| (kind != 'commit' && (!ref.bytes().all(it.is_digit()) || ref.u64() == 0)) {
+		return error('invalid commit or issue/MR number in URL')
+	}
+	return Source{repo: location.repo, kind: kind, ref: ref,
+		url: location.url() + if is_gitlab { '/-/' } else { '/' } + '${kind}/${ref}',
+		provider: location.provider, host: location.host}
+}
+
+fn (api Repository) source(input string) !Source {
+	if input.contains('://') {
+		s := source_url(input, api.provider, api.host)!
+		if api.repo != '' && s.repo.to_lower() != api.repo.to_lower() {
+			return error('URL repository ${s.repo} does not match ${api.repo}')
 		}
+		return s
 	}
-	ref := parts[3]
-	if (parts[2] == 'commit' && (ref == '' || !ref.bytes().all(it.is_hex_digit())))
-		|| (parts[2] != 'commit' && (ref == '' || !ref.bytes().all(it.is_digit()) || ref.u64() == 0)) {
-		return error('invalid commit or issue/PR number in URL')
-	}
-	url_repo := '${parts[0]}/${parts[1]}'
-	if repo != '' && repo.to_lower() != url_repo.to_lower() {
-		return error('URL repository ${url_repo} does not match ${repo}')
-	}
-	return Source{url_repo, parts[2], ref, 'https://github.com/${url_repo}/${parts[2]}/${ref}'}
+	if input == '' || input.contains_any('?#') { return error('expected a commit or issue/MR URL') }
+	return Source{repo: api.repo, kind: 'commit', ref: input,
+		url: api.url() + if api.provider == 'gitlab' { '/-/commit/' } else { '/commit/' } + input,
+		provider: api.provider, host: api.host}
 }
 
 // tagged fix commits in the cwd checkout: sha, date, subject
