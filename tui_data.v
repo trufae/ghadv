@@ -15,16 +15,19 @@ struct TuiLoad {
 	rows [][]string
 	text string
 	error string
+	repository Repository
 }
 
 // Workers own their results; only the input loop changes the displayed snapshot.
-fn tui_load(api GitHub, label string, kind TuiLoadKind, results chan TuiLoad) {
+fn tui_load(api Repository, label string, kind TuiLoadKind, results chan TuiLoad) {
 	mut rows := [][]string{}
 	mut text := ''
 	mut failure := ''
+	mut repository := api
 	match kind {
 		.repository {
-			text = github_repository() or { failure = err.msg(); '' }
+			repository = configured_repository('') or { failure = err.msg(); Repository{} }
+			text = repository.repo
 			if text == '' && failure == '' { failure = 'cannot find repository' }
 		}
 		.advisories { rows = api.advisories('') or { failure = err.msg(); [][]string{} } }
@@ -32,7 +35,7 @@ fn tui_load(api GitHub, label string, kind TuiLoadKind, results chan TuiLoad) {
 		.issues { rows = api.issues(label) or { failure = err.msg(); [][]string{} } }
 		.git_status { text = local_git_status() }
 	}
-	results <- TuiLoad{kind, rows, text, failure}
+	results <- TuiLoad{kind, rows, text, failure, repository}
 }
 
 struct TuiLoader {
@@ -44,7 +47,7 @@ mut:
 
 // Coalesce repeated reloads. A workflow may require a fresh snapshot after an
 // already running request; discard that old result before starting its successor.
-fn (mut loader TuiLoader) request(api GitHub, label string, kind TuiLoadKind, fresh bool) {
+fn (mut loader TuiLoader) request(api Repository, label string, kind TuiLoadKind, fresh bool) {
 	i := int(kind)
 	if loader.pending[i] {
 		loader.again[i] = loader.again[i] || fresh
@@ -54,7 +57,7 @@ fn (mut loader TuiLoader) request(api GitHub, label string, kind TuiLoadKind, fr
 	spawn tui_load(api, label, kind, loader.results)
 }
 
-fn (mut loader TuiLoader) poll(api GitHub, label string) ?TuiLoad {
+fn (mut loader TuiLoader) poll(api Repository, label string) ?TuiLoad {
 	for {
 		mut result := TuiLoad{}
 		if loader.results.try_pop(mut result) != .success { return none }
@@ -76,18 +79,22 @@ struct TuiActionResult {
 	message string
 }
 
-fn tui_action(api GitHub, k string, id string, results chan TuiActionResult) {
+fn tui_action(api Repository, k string, id string, results chan TuiActionResult) {
 	message := act(k, api, id) or { 'error: ' + err.msg().replace('\n', ' ') }
 	results <- TuiActionResult{id, k, message}
 }
 
-fn tui_status_load(api GitHub, id string, results chan string) {
-	results <- api.status(id) or { 'error: ${err}' }
+fn tui_status_load(api Repository, id string, cve bool, results chan string) {
+	results <- if cve { api.request_cve(id) or { 'error: ${err}' } } else { api.status(id) or { 'error: ${err}' } }
 }
 
-fn tui_status(api GitHub, id string) {
+fn tui_status(api Repository, id string) {
+	tui_details(api, id, false)
+}
+
+fn tui_details(api Repository, id string, cve bool) {
 	results := chan string{cap: 1}
-	spawn tui_status_load(api, id, results)
+	spawn tui_status_load(api, id, cve, results)
 	mut screen := TuiScreen{}
 	for {
 		mut text := ''

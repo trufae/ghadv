@@ -47,7 +47,7 @@ fn test_saved_ai_reply() ! {
 }
 
 fn test_recovery_sessions_do_not_overwrite_previous_work() ! {
-	api := GitHub{ repo: 'owner/repo' }
+	api := Repository{ repo: 'owner/repo' }
 	a := start_edit(api, 'GHSA-test', 'review', 'original', 'prompt')!
 	b := start_edit(api, 'GHSA-test', 'review', 'other original', 'other prompt')!
 	defer {

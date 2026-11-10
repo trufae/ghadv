@@ -308,9 +308,10 @@ fn row(r []string, w int) string {
 	if r.len < 5 {
 		return clip_line(r.join(' '), line_width(w))
 	}
-	line := if w < 40 { r[4] } else if w < 80 {
-		'${severity_icon(r[3])} ${r[0]} ${color(r[1], r[1])} ${r[4]}'
-	} else { '${severity_icon(r[3])} ${r[0]:-20} ${color(r[1], '${r[1]:-10}')} ${r[2]:-15} ${r[3]:-9} ${r[4]}' }
+	summary := if r.len > 7 { '[${r[7]}] ' + r[4] } else { r[4] }
+	line := if w < 40 { summary } else if w < 80 {
+		'${severity_icon(r[3])} ${r[0]} ${color(r[1], r[1])} ${summary}'
+	} else { '${severity_icon(r[3])} ${r[0]:-20} ${color(r[1], '${r[1]:-10}')} ${r[2]:-15} ${r[3]:-9} ${summary}' }
 	return clip_line(line, line_width(w))
 }
 
@@ -356,12 +357,12 @@ fn key_hints(items []string, width int) string {
 // handler resets on exec, so the child and its AI/editor still receive Ctrl+C.
 fn wait_for_workflow(_ os.Signal) {}
 
-fn tui_workflow(api GitHub, args ...string) ! {
+fn tui_workflow(api Repository, args ...string) ! {
 	terminal := os.exec(['stty', '-g'])
 	if terminal.exit_code != 0 { return error('workflow requires an interactive terminal') }
 	previous := os.signal_opt(.int, wait_for_workflow)!
 	defer { os.signal_opt(.int, previous) or {} }
-	code := os.system_args([os.executable(), '-r', api.repo, ...args])
+	code := os.system_args([os.executable(), '--provider', api.provider, '-r', api.url(), ...args])
 	// An interrupted editor may leave echo/canonical input disabled.
 	os.system_args(['stty', terminal.output.trim_space()])
 	if code == 130 {
@@ -403,7 +404,7 @@ fn action_input(prompt string) ?string {
 }
 
 // Interactive actions start in cooked mode; input is a commit or URL.
-fn run(k string, api GitHub, id string, input string) ! {
+fn run(k string, api Repository, id string, input string) ! {
 	match k {
 		'C' {
 			credits_tui(api, id)!
@@ -441,12 +442,12 @@ fn run(k string, api GitHub, id string, input string) ! {
 				os.system_args(['git', 'show', input])
 				return
 			}
-			view_text(api.source_text(source(api.repo, input)!, false)!)!
+			view_text(api.source_text(api.source(input)!, false)!)!
 		}
 	}
 }
 
-fn similar_tui(api GitHub, input string) !bool {
+fn similar_tui(api Repository, input string) !bool {
 	println('Find similar bugs with AI using ${input} as a template; results open as a saved report.')
 	println('Example: Look for the same missing bounds check in related parsers and callers.')
 	println('Enter to search; Ctrl+C or Esc to cancel. Ctrl+C also cancels the running AI.')
@@ -456,7 +457,7 @@ fn similar_tui(api GitHub, input string) !bool {
 }
 
 // Stay on the same advisory while viewing, editing, reviewing and finding related bugs.
-fn advisory_tui(api GitHub, id string, first string) ! {
+fn advisory_tui(api Repository, id string, first string) ! {
 	mut action := first
 	for {
 		match action {
@@ -488,10 +489,10 @@ fn view_text(text string) ! {
 	}
 }
 
-fn act(k string, api GitHub, id string) !string {
+fn act(k string, api Repository, id string) !string {
 	match k {
 		'a', 'c' { return api.request_cve(id) }
-		'd' { api.set_state(id, 'draft')! }
+		'd' { api.set_state(id, if api.provider == 'gitlab' { 'opened' } else { 'draft' })! }
 		'p' { api.set_state(id, 'published')! }
 		'x' { api.set_state(id, 'closed')! }
 		else { return error('unknown action: ${k}') }
@@ -643,7 +644,7 @@ fn credit_role_picker(current string) ?string {
 	return none
 }
 
-fn credits_tui(api GitHub, id string) ! {
+fn credits_tui(api Repository, id string) ! {
 	terminal := os.exec(['stty', '-g'])
 	if terminal.exit_code != 0 { return error('credits screen requires an interactive terminal') }
 	mut credits := api.credits(id)!
@@ -754,7 +755,7 @@ fn credits_tui(api GitHub, id string) ! {
 	}
 }
 
-fn tui(initial_api GitHub, label string) {
+fn tui(initial_api Repository, label string) {
 	mut api := initial_api
 	saved := os.exec(['stty', '-g']).output.trim_space()
 	raw := fn () {
@@ -809,7 +810,7 @@ fn tui(initial_api GitHub, label string) {
 					if a.len >= 5 && a[0] == completed.id {
 						match completed.key {
 							'a', 'c' { a[2] = 'requested*' }
-							'd' { a[1] = 'draft' }
+							'd' { a[1] = if api.provider == 'gitlab' { 'opened' } else { 'draft' } }
 							'p' { a[1] = 'published' }
 							'x' { a[1] = 'closed' }
 							else {}
@@ -833,7 +834,8 @@ fn tui(initial_api GitHub, label string) {
 			match result.kind {
 				.repository {
 					if result.error == '' && result.text != '' {
-						api = GitHub{ repo: result.text }
+						api = result.repository
+						filter = 0
 						invalid = api.invalid_marks() or { status = 'local invalid tags: ${err}'; map[string]string{} }
 						changed = [true, true, true]
 						loader.request(api, label, .advisories, false)
@@ -870,6 +872,7 @@ fn tui(initial_api GitHub, label string) {
 				.git_status { git_status = result.text }
 			}
 		}
+		filters := api.states()
 		w, h := terminal_size()
 		width := line_width(w)
 		layout := tui_layout(h, 3, 3)
@@ -879,7 +882,7 @@ fn tui(initial_api GitHub, label string) {
 				lists[v].mark_invalid(entries, invalid)
 				changed[v] = false
 			}
-			lists[v].filter(entries, queries[v], if v == 0 { states[filter] } else { 'all' })
+			lists[v].filter(entries, queries[v], if v == 0 { filters[filter] } else { 'all' })
 		}
 		visible := [lists[0].visible, lists[1].visible, lists[2].visible]
 		advisory_matches := lists[0].matches
@@ -900,18 +903,18 @@ fn tui(initial_api GitHub, label string) {
 		target := if input != '' { input } else { id }
 		reason := invalid[invalid_key(target)]
 		actions := if id != '' {
-			advisory_actions(advs[ai])
+			api.actions(advs[ai])
 		} else {
 			[]string{}
 		}
-		mut tabs := ['advisories ${visible[0].len} (${states[filter]})', 'commits ${visible[1].len}',
+		mut tabs := ['advisories ${visible[0].len} (${filters[filter]})', 'commits ${visible[1].len}',
 			'issues/PRs ${visible[2].len} (${label})']
 		repo_pending := loader.pending[int(TuiLoadKind.repository)]
 		for v in 0 .. tabs.len {
 			if !loaded[v] { tabs[v] += if v != 1 && api.repo == '' && !repo_pending { ' unavailable' } else { ' loading...' } }
 		}
 		repo_name := if api.repo != '' { api.repo } else if repo_pending { 'resolving repository...' } else { 'repository unavailable' }
-		header := 'ghadv ${repo_name} | local git: ${git_status}'
+		header := 'ghadv ${api.provider}:${api.host}/${repo_name} | local git: ${git_status}'
 		tab_line := tui_tabs(tabs, view, width)
 		columns := if w < 40 {
 			if view == 0 { 'SUMMARY' } else if view == 1 { 'SUBJECT' } else { 'NUMBER TITLE' }
@@ -964,7 +967,7 @@ fn tui(initial_api GitHub, label string) {
 		// Keep the active view visible when a short terminal only has one header.
 		if layout.head == 1 { headers[0] = headers[1] }
 		screen.draw(list_frame(layout, headers, body, [filter_hint,
-			key_hints(['m actions', 'i invalid', 'I unmark', 'b similar bugs', 'C credits', 's status', ...actions, 'g reload', 'A agent'], width),
+			key_hints(['m actions', 'i invalid', 'I unmark', 'b similar bugs', 's status', ...actions, 'g reload', 'A agent'], width),
 			key_hints(['? help', 'q quit', 'tab/shift-tab views', '/ text', 'f/F state', 'j/k/J/K move',
 			'enter view', 'e edit', 'r review', 'n new'], width)]), w, h)
 		mut k := ''
@@ -984,7 +987,7 @@ fn tui(initial_api GitHub, label string) {
 			}
 			screen.width = 0
 			advisory_menu := if id == '' { '' } else {
-				actions.join('\n') + '\ns status details\nv view advisory\ne edit advisory\nr AI review\nC manage credits\n'
+				actions.join('\n') + '\ns status details\nv view advisory\ne edit advisory\nr AI review\n' + if api.provider == 'github' { 'C manage credits\n' } else { '' }
 			}
 			k = tui_dialog('Actions for ${target}\n${hint}\n\n${advisory_menu}' +
 				'i mark invalid locally / edit reason\nI remove local invalid tag\nb Find similar bugs\n\nChoose a key; Enter/Esc cancels.')
@@ -1032,8 +1035,8 @@ fn tui(initial_api GitHub, label string) {
 				view = next
 			}
 			'f', 'F' {
-				step := if k == 'f' { 1 } else { states.len - 1 }
-				filter = (filter + step) % states.len
+				step := if k == 'f' { 1 } else { filters.len - 1 }
+				filter = (filter + step) % filters.len
 				sel[0], top[0] = 0, 0
 			}
 			'/' {
@@ -1074,11 +1077,11 @@ fn tui(initial_api GitHub, label string) {
 					text := tui_input('Mark ${target} invalid locally. Enter saves; Esc cancels.\nExample: No tagged release shipped vulnerable code.',
 						'Reason: ', reason, false) or { continue }
 					api.mark_invalid(target, text) or { status = 'error: ${err}'; continue }
-					invalid[invalid_key(target)] = text.trim_space()
+					invalid = api.invalid_marks() or { status = 'error: ${err}'; continue }
 					status = 'Marked ${target} invalid locally: ${text.trim_space()}'
 				} else {
 					api.unmark_invalid(target) or { status = 'error: ${err}'; continue }
-					invalid.delete(invalid_key(target))
+					invalid = api.invalid_marks() or { status = 'error: ${err}'; continue }
 					status = 'Removed local invalid tag from ${target}'
 				}
 				changed = [true, true, true]
@@ -1094,7 +1097,11 @@ fn tui(initial_api GitHub, label string) {
 				}
 				screen.width = 0
 				if k == '?' {
-					tui_dialog(tui_help + '\n\nagent: ${os.getenv_opt('GHADV_AI') or { agents[0] }}')
+					tui_dialog(if api.provider == 'gitlab' { tui_help + '\n\nGitLab: disclosures are labeled issues. f/F filters opened/closed.\nc shows CVE request instructions; d reopens; x closes.\nPublishing, draft transitions and structured credits are GitHub-only.' } else { tui_help } + '\n\nagent: ${os.getenv_opt('GHADV_AI') or { agents[0] }}')
+					continue
+				}
+				if k == 'C' && api.provider == 'gitlab' {
+					tui_dialog('GitLab credits are text in the disclosure description. Use e to edit attribution.')
 					continue
 				}
 				if k == 's' {
@@ -1130,9 +1137,14 @@ fn tui(initial_api GitHub, label string) {
 					}
 					continue
 				}
+				if api.provider == 'gitlab' && action_key == 'c' {
+					screen.width = 0
+					tui_details(api, id, true)
+					continue
+				}
 				verb := match k {
 					'a', 'c' { 'request a CVE for' }
-					'd' { 'accept/reopen as draft' }
+					'd' { if api.provider == 'gitlab' { 'reopen' } else { 'accept/reopen as draft' } }
 					'p' { 'PUBLISH' }
 					else { 'close' }
 				}

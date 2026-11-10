@@ -2,27 +2,33 @@ module main
 
 import os
 
-const help = 'Usage: ghadv [-r owner/repo] [command] [args]
+const help = 'Usage: ghadv [-r namespace/repo|url] [--provider github|gitlab] [--host hostname] [--remote name] [command] [args]
   tui [label]              advisory, commit and labeled issues/PRs tabs (default)
-  ls [state]               list all/triage/draft/published/closed advisories
+  ls [state]               GitHub advisories or GitLab disclosure issues (opened/closed)
   log                     list tagged fix commits and their advisories
   issues [label]           list labeled issues/PRs (default: GHADV_LABEL or cve)
-  new <commit|url> [context] analyze a commit, issue or PR with AI and create a draft
-  show <ghsa>              print advisory
-  status <ghsa>            show lifecycle, CVE and private report details
-  credits <ghsa>           manage credited people and roles in the TUI
-  edit <ghsa>              edit advisory in \$EDITOR
-  review <ghsa> [context]  let the AI review/rewrite it, then edit
-  similar <ghsa|commit|url> [context] find similar bugs using the selection as a template
+  new <commit|url> [context] analyze a commit, issue or PR/MR with AI and create a draft
+  show <id>              print advisory
+  status <id>            show lifecycle, CVE and private report details
+  credits <id>           manage credited people and roles in the TUI
+  edit <id>              edit advisory in \$EDITOR
+  review <id> [context]  let the AI review/rewrite it, then edit
+  similar <id|commit|url> [context] find similar bugs using the selection as a template
   resume <directory>       continue saved work without running the AI again
-  cve <ghsa>               request a CVE id (asynchronous)
-  approve <ghsa>           alias for cve
-  draft <ghsa>             accept a report or reopen as a draft
-  publish <ghsa>           publish the advisory
-  close <ghsa>             close (reject) the advisory
-  invalid <ghsa|commit|url> [reason] show its local tag, or mark invalid with a reason
-  unmark <ghsa|commit|url>  remove its local invalid tag
+  cve <id>                 GitHub: request CVE; GitLab: show CVE request instructions
+  approve <id>           alias for cve
+  draft <id>             accept a report or reopen as a draft
+  publish <id>           publish the advisory
+  close <id>               close the advisory/disclosure
+  reopen <id>              reopen a closed advisory/disclosure
+  GitLab disclosure IDs use GL-<issue number>; publish/draft/credits are GitHub-only.
+  invalid <id|commit|url> [reason] show its local tag, or mark invalid with a reason
+  unmark <id|commit|url>  remove its local invalid tag
 Environment:
+  GHADV_PROVIDER  github or gitlab (default: detect from Git remote or source URL)
+  GHADV_HOST      server hostname (custom hosts also need a provider)
+  GHADV_REMOTE    Git remote to use instead of upstream/origin
+  GHADV_ADVISORY_LABEL  GitLab disclosure label (default: security-advisory)
   GHADV_REPO   default repository (otherwise taken from the cwd checkout)
   GHADV_GREP   git log -E --grep for fix commits (default: ##(crash|security|vulnerability|sandbox))
   GHADV_LABEL  issues/PRs label (default: cve; includes open and closed items)
@@ -39,9 +45,15 @@ fn issue_label(label string) string {
 
 fn main() {
 	mut args := os.args[1..].clone()
-	mut repo := os.getenv('GHADV_REPO')
-	if args.len > 1 && args[0] == '-r' {
-		repo = args[1]
+	for args.len > 0 && args[0] in ['-r', '--provider', '--host', '--remote'] {
+		if args.len < 2 { eprintln('missing value for ${args[0]}'); exit(1) }
+		name := match args[0] {
+			'-r' { 'GHADV_REPO' }
+			'--provider' { 'GHADV_PROVIDER' }
+			'--host' { 'GHADV_HOST' }
+			else { 'GHADV_REMOTE' }
+		}
+		os.setenv(name, args[1], true)
 		args = args[2..].clone()
 	}
 	if args.len > 0 && args[0] in ['-h', '--help', 'help'] {
@@ -62,28 +74,23 @@ fn main() {
 		}
 		return
 	}
-	if id != '' && (cmd == 'new' || (cmd in ['similar', 'invalid', 'unmark'] && !id.to_lower().starts_with('ghsa-'))) {
-		s := source(repo, id) or {
-			eprintln(err)
-			exit(1)
-		}
-		repo = s.repo
-	}
 	if cmd == 'tui' {
-		tui(GitHub{ repo: repo }, issue_label(id))
+		tui(Repository{}, issue_label(id))
 		return
 	}
-	if repo == '' {
-		repo = github_repository() or {
-			eprintln('cannot find repository, use -r owner/repo or GHADV_REPO')
-			exit(1)
-		}
+	input := if cmd in ['new', 'similar', 'invalid', 'unmark'] { id } else { '' }
+	api := configured_repository(input) or {
+		eprintln('cannot select repository: ${err}')
+		exit(1)
 	}
-	if cmd !in ['tui', 'ls', 'log', 'issues'] && id == '' {
+	if cmd !in ['ls', 'log', 'issues'] && id == '' {
 		eprintln(help)
 		exit(1)
 	}
-	api := GitHub{ repo: repo }
+	if api.provider == 'gitlab' && cmd in ['draft', 'publish'] {
+		eprintln('GitLab disclosure issues use close/reopen; manage confidentiality explicitly on GitLab. This does not publish a CVE.')
+		exit(1)
+	}
 	match cmd {
 		'ls' {
 			marks := api.invalid_marks()!
@@ -106,7 +113,7 @@ fn main() {
 			}
 		}
 		'invalid', 'unmark' {
-			target := invalid_target(api.repo, id) or {
+			target := api.invalid_target(id) or {
 				eprintln('error: ${err}')
 				exit(1)
 			}
@@ -166,10 +173,11 @@ fn main() {
 		'cve', 'approve' {
 			println(api.request_cve(id)!)
 		}
-		'draft', 'publish', 'close' {
+		'draft', 'publish', 'close', 'reopen' {
 			if os.input('${cmd} ${id}? [y/N] ') == 'y' {
 				state := match cmd {
 					'draft' { 'draft' }
+					'reopen' { if api.provider == 'gitlab' { 'opened' } else { 'draft' } }
 					'publish' { 'published' }
 					else { 'closed' }
 				}

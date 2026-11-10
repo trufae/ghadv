@@ -14,15 +14,15 @@ fn test_invalid_marks_persist_and_are_scoped_to_host_repository_and_item() ! {
 		if value := old_host { os.setenv('GH_HOST', value, true) } else { os.unsetenv('GH_HOST') }
 		os.rmdir_all(dir) or {}
 	}
-	api := GitHub{repo: 'owner/repo'}
+	api := Repository{repo: 'owner/repo'}
 	assert api.invalid_marks()!.len == 0
 	assert !os.exists(dir)
 	target := invalid_target(api.repo, 'GHSA-abcd-efgh-ijkl')!
 	api.mark_invalid(target, ' No tagged release shipped vulnerable code.\nIntroduced and fixed after v1. ' )!
-	assert GitHub{repo: 'OWNER/REPO'}.invalid_marks()![target] == 'No tagged release shipped vulnerable code.\nIntroduced and fixed after v1.'
-	assert GitHub{repo: 'other/repo'}.invalid_marks()!.len == 0
+	assert Repository{repo: 'OWNER/REPO'}.invalid_marks()![target] == 'No tagged release shipped vulnerable code.\nIntroduced and fixed after v1.'
+	assert Repository{repo: 'other/repo'}.invalid_marks()!.len == 0
 	os.setenv('GH_HOST', 'enterprise.example', true)
-	assert api.invalid_marks()!.len == 0
+	assert Repository{repo: api.repo, host: 'enterprise.example'}.invalid_marks()!.len == 0
 	os.setenv('GH_HOST', 'github.com', true)
 	issue := 'https://github.com/owner/repo/issues/1'
 	api.mark_invalid(issue, 'Duplicate report')!

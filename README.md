@@ -1,6 +1,7 @@
 # ghadv
 
-Manage GitHub security advisories from the command line. Written in [V](https://vlang.io).
+Manage GitHub security advisories and GitLab disclosure issues from the command line.
+Written in [V](https://vlang.io).
 
 Turn a fix commit, issue or pull request into a published advisory — an AI agent does the
 reconstruction, you keep the last word.
@@ -26,6 +27,16 @@ $ ghadv new 8f3a2c1 found by fuzzing the PDB parser
 - Tags individual advisories, commits and issues/PRs as invalid locally, with a reason and undo.
 
 Advisories are plain text in `$EDITOR` — no JSON, no web forms.
+
+GitLab repositories are detected from their Git remote or source URL. Authenticate with
+`glab auth login`; `new` creates a **confidential issue** labeled `security-advisory`.
+Use `GL-123` to show, edit, review, close or reopen that disclosure. `cve GL-123` explains
+GitLab's CVE request process; it does not submit a request. GitLab has no equivalent to
+GitHub's advisory publishing endpoint, so `publish`, `draft` and structured `credits`
+remain GitHub-only. GitLab Ultimate vulnerability reports are not required or queried.
+Custom servers use `--provider gitlab -r https://code.example/group/project`.
+Use `--remote name` to choose another Git remote. The `ghadv` command and existing
+`GHADV_*` settings remain supported.
 
 ## Install
 

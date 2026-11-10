@@ -2,6 +2,7 @@ module main
 
 import os
 import net.urllib
+import crypto.sha256
 
 // Keep the host with the project: identical paths can exist on different forges.
 struct Repository {
@@ -12,6 +13,15 @@ struct Repository {
 
 fn (api Repository) url() string {
 	return 'https://${api.host}/${api.repo}'
+}
+
+fn (api Repository) state_path(kind string, id string) string {
+	configured := os.getenv('XDG_STATE_HOME')
+	base := if configured != '' { configured } else { os.join_path(os.home_dir(), '.local', 'state') }
+	// Preserve the existing GitHub filenames while isolating GitLab records.
+	identity := '${api.host}\n${api.repo}\n${id}'.to_lower()
+	receipt := sha256.hexhash(if api.provider == 'gitlab' { 'gitlab\n${identity}' } else { identity })
+	return os.join_path(base, 'ghadv', kind, receipt)
 }
 
 fn repository_location(input string, provider string, host string) !Repository {
@@ -91,4 +101,22 @@ fn resolve_repository(input string, provider string, host string, remote string)
 	}
 	location := repository_location(url, provider, host)!
 	return if input == '' { location } else { repository_location(input, location.provider, location.host)! }
+}
+
+fn configured_repository(input string) !Repository {
+	repo := os.getenv('GHADV_REPO')
+	provider := os.getenv('GHADV_PROVIDER')
+	mut host := os.getenv('GHADV_HOST')
+	if host == '' && !repo.contains('://') && !repo.contains('@') && !input.contains('://') {
+		host = os.getenv(if provider == 'gitlab' { 'GITLAB_HOST' } else { 'GH_HOST' })
+	}
+	if input.contains('://') {
+		s := source_url(input, provider, host)!
+		if repo != '' {
+			selected := repository_location(repo, s.provider, s.host)!
+			if selected.repo.to_lower() != s.repo.to_lower() { return error('source URL does not match selected repository') }
+		}
+		return Repository{repo: s.repo, host: s.host, provider: s.provider}
+	}
+	return resolve_repository(repo, provider, host, os.getenv('GHADV_REMOTE'))
 }

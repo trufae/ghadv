@@ -15,10 +15,17 @@ fn invalid_key(input string) string {
 }
 
 fn invalid_target(repo string, input string) !string {
+	return Repository{repo: repo}.invalid_target(input)
+}
+
+fn (api Repository) invalid_target(input string) !string {
 	if input.to_lower().starts_with('ghsa-') {
 		return invalid_key(input)
 	}
-	s := source(repo, input)!
+	if api.provider == 'gitlab' && input.to_upper().starts_with('GL-') {
+		return invalid_key('${api.url()}/-/issues/${gitlab_iid(input.to_upper())!}')
+	}
+	s := api.source(input)!
 	if s.kind != 'commit' { return invalid_key(s.url) }
 	if s.ref.len == 40 && s.ref.bytes().all(it.is_hex_digit()) {
 		return invalid_key(s.ref)
@@ -31,11 +38,11 @@ fn invalid_target(repo string, input string) !string {
 	return invalid_key(r.output.trim_space())
 }
 
-fn (api GitHub) invalid_path(target string) string {
-	return os.join_path(api.state_path('invalid', ''), sha256.hexhash(invalid_key(target)) + '.json')
+fn (api Repository) invalid_path(target string) string {
+	return os.join_path(api.state_path('invalid', ''), sha256.hexhash(api.invalid_target(target) or { invalid_key(target) }) + '.json')
 }
 
-fn (api GitHub) invalid_marks() !map[string]string {
+fn (api Repository) invalid_marks() !map[string]string {
 	dir := api.state_path('invalid', '')
 	mut marks := map[string]string{}
 	if !os.exists(dir) { return marks }
@@ -47,11 +54,16 @@ fn (api GitHub) invalid_marks() !map[string]string {
 			return error('invalid local triage record: ${path}')
 		}
 		marks[invalid_key(mark.target)] = mark.reason
+		if api.provider == 'gitlab' {
+			if s := api.source(mark.target) {
+				if s.kind == 'issues' { marks['gl-${s.ref}'] = mark.reason }
+			}
+		}
 	}
 	return marks
 }
 
-fn (api GitHub) mark_invalid(target string, reason string) ! {
+fn (api Repository) mark_invalid(target string, reason string) ! {
 	if target == '' || reason.trim_space() == '' {
 		return error('an invalid tag requires a target and a reason')
 	}
@@ -59,11 +71,11 @@ fn (api GitHub) mark_invalid(target string, reason string) ! {
 	os.mkdir_all(os.dir(path), mode: 0o700)!
 	tmp := '${path}.${os.getpid()}.tmp'
 	defer { os.rm(tmp) or {} }
-	os.write_file(tmp, json2.encode(InvalidMark{invalid_key(target), reason.trim_space()}))!
+	os.write_file(tmp, json2.encode(InvalidMark{api.invalid_target(target)!, reason.trim_space()}))!
 	os.rename(tmp, path)!
 }
 
-fn (api GitHub) unmark_invalid(target string) ! {
+fn (api Repository) unmark_invalid(target string) ! {
 	path := api.invalid_path(target)
 	if os.exists(path) { os.rm(path)! }
 }
