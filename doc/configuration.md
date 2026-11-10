@@ -8,7 +8,7 @@
 | `GHADV_AI` | `claude -p` | agent command, prompt on stdin |
 | `EDITOR` | `vi` | editor for drafts and reviews |
 | `PAGER` | `less` | advisory and issue/PR viewer when `r2` is not on `PATH` |
-| `XDG_STATE_HOME` | `~/.local/state` | base directory for persistent CVE request records |
+| `XDG_STATE_HOME` | `~/.local/state` | base directory for persistent CVE request records and invalid tags |
 
 `-r owner/repo` overrides `GHADV_REPO`.
 For `new <url>`, the URL supplies the repository before the cwd checkout is consulted;
@@ -30,6 +30,15 @@ The list shows `requested*` while a recorded request has no assigned CVE;
 `ghadv status <ghsa>` shows when the request was accepted. An assigned CVE takes
 precedence over the local record. Requests made through the GitHub website or raw
 `gh` commands do not create these local records.
+
+## Local invalid tags
+
+Invalid tags and their reasons are JSON files below `$XDG_STATE_HOME/ghadv/invalid/`,
+or `~/.local/state/ghadv/invalid/` by default. A hash of `GH_HOST` (default `github.com`)
+and the repository scopes the directory; a hash of the advisory ID, full commit SHA or
+issue/PR URL identifies each record. IDs and URLs are compared without case sensitivity.
+Tags are shared by the CLI and TUI and by checkouts of the same repository on this machine.
+They are not uploaded to GitHub. `ghadv unmark <ghsa|commit|url>` removes a record.
 
 ## Permissions
 

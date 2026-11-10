@@ -33,7 +33,9 @@ Keys:
 | `r` | AI-review the linked advisory |
 | `b` | find similar bugs using the selected advisory or source as a template |
 | `C` | manage credited people and roles for the linked advisory |
-| `m` | open the selected advisory's actions menu |
+| `m` | open the selected item's actions menu, including linked advisory actions |
+| `i` | mark the selected advisory, commit or issue/PR invalid locally, or edit its reason |
+| `I` | remove the selected item's local invalid tag |
 | `c` / `a` | request a CVE, including for a published advisory |
 | `d` | accept a triage report or reopen a closed advisory as draft |
 | `p` | publish |
@@ -62,6 +64,13 @@ In the commit and issues/PRs views, advisory actions act on the advisory that re
 the selected item. If there is none, press `n` to prepare a draft, review it in `$EDITOR`,
 then `c` to request a CVE. Issue/PR links require their full URL in the advisory description.
 Creating a draft does not request a CVE, publish, or remove the label.
+
+Local invalid tags apply only to the selected item. Press `i`, enter a reason such as
+"No tagged release shipped vulnerable code", and press Enter to save; Escape or Ctrl+C
+cancels. An empty reason is rejected. Tagged rows show `[invalid]`, the status line shows
+the reason, and the actions menu wraps long reasons. Press `I` to remove the tag. The
+`/` filter also searches `invalid` and the reason. Tags survive restarts; `g` reloads tags
+changed by another ghadv process. They leave GitHub state and linked items unchanged.
 
 `b` also works on commits and issues/PRs without a linked advisory. It prompts for optional
 search instructions, such as "Look for the same missing bounds check in related parsers

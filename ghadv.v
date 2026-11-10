@@ -20,6 +20,8 @@ const help = 'Usage: ghadv [-r owner/repo] [command] [args]
   draft <ghsa>             accept a report or reopen as a draft
   publish <ghsa>           publish the advisory
   close <ghsa>             close (reject) the advisory
+  invalid <ghsa|commit|url> [reason] show its local tag, or mark invalid with a reason
+  unmark <ghsa|commit|url>  remove its local invalid tag
 Environment:
   GHADV_REPO   default repository (otherwise taken from the cwd checkout)
   GHADV_GREP   git log -E --grep for fix commits (default: ##(crash|security|vulnerability|sandbox))
@@ -60,7 +62,7 @@ fn main() {
 		}
 		return
 	}
-	if id != '' && (cmd == 'new' || (cmd == 'similar' && !id.starts_with('GHSA-'))) {
+	if id != '' && (cmd == 'new' || (cmd in ['similar', 'invalid', 'unmark'] && !id.to_lower().starts_with('ghsa-'))) {
 		s := source(repo, id) or {
 			eprintln(err)
 			exit(1)
@@ -84,20 +86,45 @@ fn main() {
 	api := GitHub{ repo: repo }
 	match cmd {
 		'ls' {
+			marks := api.invalid_marks()!
 			for r in api.advisories(id)! {
-				println(row(r, 999))
+				println(marked_row(row(r, 999), marks[invalid_key(r[0])], 999))
 			}
 		}
 		'log' {
+			marks := api.invalid_marks()!
 			advs := api.advisories('')!
 			for c in commits()! {
-				println(crow(c, advs, 999))
+				println(marked_row(crow(c, advs, 999), marks[invalid_key(c[0])], 999))
 			}
 		}
 		'issues' {
+			marks := api.invalid_marks()!
 			advs := api.advisories('')!
 			for item in api.issues(issue_label(id))! {
-				println(irow(item, advs, 999))
+				println(marked_row(irow(item, advs, 999), marks[invalid_key(item[0])], 999))
+			}
+		}
+		'invalid', 'unmark' {
+			target := invalid_target(api.repo, id) or {
+				eprintln('error: ${err}')
+				exit(1)
+			}
+			if cmd == 'invalid' {
+				if ctx.trim_space() == '' {
+					marks := api.invalid_marks()!
+					reason := marks[target]
+					println(if reason == '' { 'No local invalid tag for ${id}' } else { 'invalid (local): ${reason}' })
+					return
+				}
+				api.mark_invalid(target, ctx) or {
+					eprintln('error: ${err}')
+					exit(1)
+				}
+				println('Marked ${id} invalid locally: ${ctx}')
+			} else {
+				api.unmark_invalid(target)!
+				println('Removed local invalid tag from ${id}')
 			}
 		}
 		'new' {

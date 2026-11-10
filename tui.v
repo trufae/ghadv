@@ -230,6 +230,7 @@ enter: view advisory/commit/issue/PR; e: edit; r: AI review; n: new draft
 b: find similar bugs using the selected advisory or source as a template
 C: manage advisory credits (finder, reporter, fix developer and other roles)
 c (or a): request CVE; d: accept/reopen as draft; p: publish; x: close
+i: tag the selected item invalid locally (with a reason); I: remove the tag
 s: advisory status; m: actions menu; f/F: next/previous advisory state filter
 /: filter the current list by text (Enter applies; empty clears; Esc cancels)
 g: reload; A: cycle AI agent
@@ -781,6 +782,10 @@ fn tui(initial_api GitHub, label string) {
 	mut sel := [0, 0, 0]
 	mut top := [0, 0, 0]
 	mut status := ''
+	mut invalid := map[string]string{}
+	if api.repo != '' {
+		invalid = api.invalid_marks() or { status = 'local invalid tags: ${err}'; map[string]string{} }
+	}
 	mut filter := 0
 	mut queries := ['', '', '']
 	mut screen := TuiScreen{}
@@ -829,6 +834,8 @@ fn tui(initial_api GitHub, label string) {
 				.repository {
 					if result.error == '' && result.text != '' {
 						api = GitHub{ repo: result.text }
+						invalid = api.invalid_marks() or { status = 'local invalid tags: ${err}'; map[string]string{} }
+						changed = [true, true, true]
 						loader.request(api, label, .advisories, false)
 						loader.request(api, label, .issues, false)
 					}
@@ -869,6 +876,7 @@ fn tui(initial_api GitHub, label string) {
 		for v, entries in [advs, cms, items] {
 			if changed[v] {
 				lists[v].rebuild(entries, advs, links, v)
+				lists[v].mark_invalid(entries, invalid)
 				changed[v] = false
 			}
 			lists[v].filter(entries, queries[v], if v == 0 { states[filter] } else { 'all' })
@@ -889,6 +897,8 @@ fn tui(initial_api GitHub, label string) {
 		}
 		ai := if selected >= 0 { lists[view].links[selected] } else { -1 }
 		id := if ai >= 0 && ai < advs.len && advs[ai].len >= 5 { advs[ai][0] } else { '' }
+		target := if input != '' { input } else { id }
+		reason := invalid[invalid_key(target)]
 		actions := if id != '' {
 			advisory_actions(advs[ai])
 		} else {
@@ -937,6 +947,8 @@ fn tui(initial_api GitHub, label string) {
 			'Updating ${pending_action}... You can keep browsing; other changes and quitting wait for completion.'
 		} else if status != '' {
 			status
+		} else if reason != '' {
+			'invalid (local): ${reason}'
 		} else if id != '' {
 			cve := match advs[ai][2] {
 				'requested*' { 'CVE request recorded locally; g reload, s status' }
@@ -952,7 +964,7 @@ fn tui(initial_api GitHub, label string) {
 		// Keep the active view visible when a short terminal only has one header.
 		if layout.head == 1 { headers[0] = headers[1] }
 		screen.draw(list_frame(layout, headers, body, [filter_hint,
-			key_hints(['m actions', 'b similar bugs', 'C credits', 's status', ...actions, 'g reload', 'A agent'], width),
+			key_hints(['m actions', 'i invalid', 'I unmark', 'b similar bugs', 'C credits', 's status', ...actions, 'g reload', 'A agent'], width),
 			key_hints(['? help', 'q quit', 'tab/shift-tab views', '/ text', 'f/F state', 'j/k/J/K move',
 			'enter view', 'e edit', 'r review', 'n new'], width)]), w, h)
 		mut k := ''
@@ -966,17 +978,20 @@ fn tui(initial_api GitHub, label string) {
 		if k == '' { continue }
 		status = ''
 		if k == 'm' {
-			if id == '' {
-				status = 'no advisory selected'
+			if target == '' {
+				status = 'no item selected'
 				continue
 			}
 			screen.width = 0
-			k = tui_dialog('Actions for ${id}\n${advs[ai][4]}\n${hint}\n\n' + actions.join('\n') +
-				'\ns status details\nv view advisory\ne edit advisory\nr AI review\nb Find similar bugs\nC manage credits\n\nChoose a key; Enter/Esc cancels.')
+			advisory_menu := if id == '' { '' } else {
+				actions.join('\n') + '\ns status details\nv view advisory\ne edit advisory\nr AI review\nC manage credits\n'
+			}
+			k = tui_dialog('Actions for ${target}\n${hint}\n\n${advisory_menu}' +
+				'i mark invalid locally / edit reason\nI remove local invalid tag\nb Find similar bugs\n\nChoose a key; Enter/Esc cancels.')
 			if k == 'v' {
 				k = '\n'
 				show_input = ''
-			} else if k !in ['s', 'e', 'r', 'b', 'C'] && !actions.any(it.starts_with(k + ' ')) {
+			} else if k !in ['s', 'e', 'r', 'b', 'C', 'i', 'I'] && !actions.any(it.starts_with(k + ' ')) {
 				continue
 			}
 		}
@@ -1036,6 +1051,10 @@ fn tui(initial_api GitHub, label string) {
 				status = 'agent: ${os.getenv('GHADV_AI')}'
 			}
 			'g' {
+				if api.repo != '' {
+					invalid = api.invalid_marks() or { status = 'local invalid tags: ${err}'; invalid.clone() }
+					changed = [true, true, true]
+				}
 				loader.request(api, label, .commits, false)
 				loader.request(api, label, .git_status, false)
 				if api.repo == '' {
@@ -1044,6 +1063,25 @@ fn tui(initial_api GitHub, label string) {
 					loader.request(api, label, .advisories, false)
 					loader.request(api, label, .issues, false)
 				}
+			}
+			'i', 'I' {
+				if api.repo == '' || target == '' {
+					status = 'select an item in a loaded repository first'
+					continue
+				}
+				screen.width = 0
+				if k == 'i' {
+					text := tui_input('Mark ${target} invalid locally. Enter saves; Esc cancels.\nExample: No tagged release shipped vulnerable code.',
+						'Reason: ', reason, false) or { continue }
+					api.mark_invalid(target, text) or { status = 'error: ${err}'; continue }
+					invalid[invalid_key(target)] = text.trim_space()
+					status = 'Marked ${target} invalid locally: ${text.trim_space()}'
+				} else {
+					api.unmark_invalid(target) or { status = 'error: ${err}'; continue }
+					invalid.delete(invalid_key(target))
+					status = 'Removed local invalid tag from ${target}'
+				}
+				changed = [true, true, true]
 			}
 			'\n', '\r', 'e', 'r', 'b', 'n', 's', 'C', '?' {
 				if api.repo == '' && k != '?' && !(view == 1 && k in ['\n', '\r']) {

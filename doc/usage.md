@@ -22,6 +22,8 @@ ghadv [-r owner/repo] [command] [args]
   draft <ghsa>            accept a report or reopen as a draft
   publish <ghsa>          publish the advisory
   close <ghsa>            close (reject) the advisory
+  invalid <ghsa|commit|url> [reason] show a local tag, or mark invalid with a reason
+  unmark <ghsa|commit|url> remove its local invalid tag
 ```
 
 `-h`, `--help` or `help` prints the same text.
@@ -32,7 +34,7 @@ The repository is resolved in this order:
 
 1. `-r owner/repo`
 2. `$GHADV_REPO`
-3. The GitHub URL for `new <url>` or `similar <url>` (must match an explicit repository above)
+3. The GitHub URL for `new`, `similar`, `invalid` or `unmark` (must match an explicit repository above)
 4. `gh repo view --json nameWithOwner` in the current directory
 
 If none works, `ghadv` exits with `cannot find repository, use -r owner/repo or GHADV_REPO`.
@@ -168,6 +170,36 @@ access. See the [GitHub CVE request endpoint](https://docs.github.com/en/rest/se
 `ghadv status <ghsa>` shows the advisory state, assigned CVE, private-report acceptance,
 timestamps (including withdrawal), private fork, and GitHub URL. Withdrawal is metadata,
 not an additional state that this CLI can set.
+
+### invalid / unmark
+
+Record a local triage decision for an advisory, commit, issue or PR:
+
+```sh
+ghadv invalid GHSA-xxxx-yyyy-zzzz "No tagged release shipped vulnerable code"
+ghadv invalid 8f3a2c1 "Introduced after v1.0 and fixed before v1.1"
+ghadv invalid https://github.com/OWNER/REPO/issues/123 "Duplicate report"
+ghadv invalid GHSA-xxxx-yyyy-zzzz       # read the saved reason
+ghadv unmark GHSA-xxxx-yyyy-zzzz        # remove the tag
+```
+
+A nonempty reason sets or replaces the tag. Omitting it displays the saved reason.
+Commits are stored by full SHA; short hashes and refs resolve in the current checkout,
+which must belong to the selected repository. A full commit SHA or full-SHA URL also
+works outside a checkout. URL query strings and fragments are ignored.
+
+The CLI lists and TUI show `[invalid]`. In the TUI, `i` adds or edits the reason, `I`
+clears it, and `/` searches `invalid` or words in the reason. Tagged items remain visible.
+Marking a commit or issue does not implicitly mark its linked advisory, or vice versa.
+Tags persist per GitHub host and repository on this machine; they are not shared with
+collaborators. See [storage](configuration.md#local-invalid-tags).
+
+GitHub advisories have no native `invalid` state or custom labels. To keep the decision
+upstream, use `ghadv edit <ghsa>` to explain why no released version is affected, then
+`ghadv close <ghsa>` for an unpublished advisory/report. The local tag does not close
+an advisory, change issue/PR labels, publish anything, or reject an assigned CVE.
+GitHub's supported fields are listed in the
+[advisory API](https://docs.github.com/en/rest/security-advisories/repository-advisories#update-a-repository-security-advisory).
 
 ### draft / publish / close
 

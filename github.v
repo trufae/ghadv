@@ -101,12 +101,16 @@ fn (api GitHub) status(id string) !string {
 // GitHub exposes assigned IDs, but no pending-request status. Keep a receipt of
 // successful requests, shared by the CLI and TUI, without treating it as live status.
 fn (api GitHub) cve_request_path(id string) string {
+	return api.state_path('cve-requests', id)
+}
+
+fn (api GitHub) state_path(kind string, id string) string {
 	configured := os.getenv('XDG_STATE_HOME')
 	base := if configured != '' { configured } else { os.join_path(os.home_dir(), '.local', 'state') }
 	configured_host := os.getenv('GH_HOST')
 	host := if configured_host != '' { configured_host } else { 'github.com' }
 	receipt := sha256.hexhash('${host}\n${api.repo}\n${id}'.to_lower())
-	return os.join_path(base, 'ghadv', 'cve-requests', receipt)
+	return os.join_path(base, 'ghadv', kind, receipt)
 }
 
 fn (api GitHub) cve_requested_at(id string) string {

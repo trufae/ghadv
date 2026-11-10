@@ -112,6 +112,7 @@ struct TuiList {
 mut:
 	links []int
 	search []string
+	invalid []string
 	matches []int
 	visible []int
 	formatted map[int]TuiRow
@@ -124,10 +125,22 @@ mut:
 fn (mut list TuiList) rebuild(entries [][]string, advs [][]string, links AdvisoryLinks, view int) {
 	list.links = []int{len: entries.len, init: -1}
 	list.search = []string{len: entries.len}
+	list.invalid = []string{len: entries.len}
 	for i, entry in entries {
 		linked := if view == 0 { i } else if entry.len > 0 { links.find(entry[0]) } else { -1 }
 		list.links[i] = linked
 		list.search[i] = (entry.join(' ') + if view != 0 && linked >= 0 { ' ' + advs[linked][0] } else { '' }).to_lower()
+	}
+	list.formatted.clear()
+	list.filtered = false
+}
+
+fn (mut list TuiList) mark_invalid(entries [][]string, marks map[string]string) {
+	for i, entry in entries {
+		if entry.len == 0 { continue }
+		reason := marks[invalid_key(entry[0])]
+		list.invalid[i] = reason
+		if reason != '' { list.search[i] += ' invalid ' + reason.to_lower() }
 	}
 	list.formatted.clear()
 	list.filtered = false
@@ -156,11 +169,12 @@ fn (mut list TuiList) line(index int, entries [][]string, advs [][]string, view 
 	if index !in list.formatted {
 		linked := list.links[index]
 		a := if linked >= 0 { advs[linked] } else { []string{} }
-		normal := match view {
+		line := match view {
 			0 { row(entries[index], width) }
 			1 { commit_row(entries[index], a, width) }
 			else { issue_row(entries[index], a, width) }
 		}
+		normal := marked_row(line, list.invalid[index], width)
 		list.formatted[index] = TuiRow{normal, term.inverse(term.strip_ansi(normal))}
 	}
 	line := list.formatted[index]

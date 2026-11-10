@@ -23,6 +23,7 @@ $ ghadv new 8f3a2c1 found by fuzzing the PDB parser
 - Manages credits (finders, reporters, fix authors, ...) in a TUI screen.
 - Requests CVEs, accepts private reports, publishes and closes advisories. TUI actions confirm.
 - Saves accepted CVE requests locally, preserving `requested*` across restarts until a CVE is assigned.
+- Tags individual advisories, commits and issues/PRs as invalid locally, with a reason and undo.
 
 Advisories are plain text in `$EDITOR` — no JSON, no web forms.
 
@@ -78,6 +79,16 @@ Key commands:
 | `resume <dir>` | continue saved work |
 | `cve <ghsa>` | request a CVE id |
 | `draft/publish/close <ghsa>` | change state |
+| `invalid <ghsa\|commit\|url> [reason]` | show a local invalid tag, or set it with a reason |
+| `unmark <ghsa\|commit\|url>` | remove a local invalid tag |
+
+For example, `ghadv invalid GHSA-xxxx-yyyy-zzzz "No tagged release shipped vulnerable code"`
+records a local triage decision. In the TUI, `i` marks the selected item or edits its reason,
+and `I` removes the tag. Lists show `[invalid]`; `/` searches both the tag and its reason.
+Tags survive restarts and apply only to the selected item, independently of linked items.
+They do not change GitHub. To record an advisory decision upstream, use `edit` to explain
+the finding in its description, then `close` to reject an unpublished advisory/report.
+See [invalid tags](doc/usage.md#invalid--unmark).
 
 The `log` command and TUI commit tab include commits tagged `##crash`, `##security`,
 `##vulnerability` or `##sandbox` by default. Override the pattern with `GHADV_GREP`.
