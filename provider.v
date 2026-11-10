@@ -21,6 +21,15 @@ fn (api Repository) actions(a []string) []string {
 	return actions
 }
 
+fn (api Repository) help_text() string {
+	if api.provider == 'github' { return tui_help }
+	return tui_help.all_before('States:')
+		.replace('C: manage advisory credits (finder, reporter, fix developer and other roles)', 'Credits: use e to edit attribution in the disclosure text')
+		.replace('c (or a): request CVE; d: accept/reopen as draft; p: publish; x: close', 'c (or a): CVE request instructions; d: reopen issue; x: close issue')
+		.replace('advisories', 'disclosures').replace('advisory', 'disclosure').replace('PR', 'MR') +
+		'States: opened, closed. Confidentiality is shown separately.\nClosing or reopening never changes confidentiality.\nCVE IDs are references in the issue text, not proof of assignment or publication.\nGitLab CVE requests use a separate issue; c shows the instructions.\nPublishing and draft transitions are GitHub-only.'
+}
+
 fn (api Repository) advisories(state string) ![][]string {
 	if state != '' && state !in api.states() { return error('invalid state: ${state}; choose ${api.states().join(', ')}') }
 	return if api.provider == 'gitlab' { api.gitlab_advisories(state)! } else { api.github_advisories(state)! }

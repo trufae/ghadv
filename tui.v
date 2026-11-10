@@ -907,8 +907,10 @@ fn tui(initial_api Repository, label string) {
 		} else {
 			[]string{}
 		}
-		mut tabs := ['advisories ${visible[0].len} (${filters[filter]})', 'commits ${visible[1].len}',
-			'issues/PRs ${visible[2].len} (${label})']
+		records_title := if api.provider == 'gitlab' { 'disclosures' } else { 'advisories' }
+		sources_title := if api.provider == 'gitlab' { 'issues/MRs' } else { 'issues/PRs' }
+		mut tabs := ['${records_title} ${visible[0].len} (${filters[filter]})', 'commits ${visible[1].len}',
+			'${sources_title} ${visible[2].len} (${label})']
 		repo_pending := loader.pending[int(TuiLoadKind.repository)]
 		for v in 0 .. tabs.len {
 			if !loaded[v] { tabs[v] += if v != 1 && api.repo == '' && !repo_pending { ' unavailable' } else { ' loading...' } }
@@ -955,10 +957,11 @@ fn tui(initial_api Repository, label string) {
 		} else if id != '' {
 			cve := match advs[ai][2] {
 				'requested*' { 'CVE request recorded locally; g reload, s status' }
-				'-' { 'no CVE assigned; request status unknown' }
-				else { advs[ai][2] }
+				'-' { if api.provider == 'gitlab' { 'no CVE referenced' } else { 'no CVE assigned; request status unknown' } }
+				else { if api.provider == 'gitlab' { 'CVE references: ' + advs[ai][2] } else { advs[ai][2] } }
 			}
-			'${id} | ${advs[ai][1]} | ${cve}'
+			visibility := if advs[ai].len > 7 { advs[ai][7] + ' | ' } else { '' }
+			'${id} | ${advs[ai][1]} | ${visibility}${cve}'
 		} else {
 			'No advisory selected; n creates a draft from a commit, issue or PR'
 		}
@@ -966,8 +969,9 @@ fn tui(initial_api Repository, label string) {
 		mut headers := [term.bold(header), term.bold(tab_line), term.dim(columns)]
 		// Keep the active view visible when a short terminal only has one header.
 		if layout.head == 1 { headers[0] = headers[1] }
+		credit_hint := if api.provider == 'github' { ['C credits'] } else { []string{} }
 		screen.draw(list_frame(layout, headers, body, [filter_hint,
-			key_hints(['m actions', 'i invalid', 'I unmark', 'b similar bugs', 's status', ...actions, 'g reload', 'A agent'], width),
+			key_hints(['m actions', 'i invalid', 'I unmark', 'b similar bugs', ...credit_hint, 's status', ...actions, 'g reload', 'A agent'], width),
 			key_hints(['? help', 'q quit', 'tab/shift-tab views', '/ text', 'f/F state', 'j/k/J/K move',
 			'enter view', 'e edit', 'r review', 'n new'], width)]), w, h)
 		mut k := ''
@@ -1097,7 +1101,7 @@ fn tui(initial_api Repository, label string) {
 				}
 				screen.width = 0
 				if k == '?' {
-					tui_dialog(if api.provider == 'gitlab' { tui_help + '\n\nGitLab: disclosures are labeled issues. f/F filters opened/closed.\nc shows CVE request instructions; d reopens; x closes.\nPublishing, draft transitions and structured credits are GitHub-only.' } else { tui_help } + '\n\nagent: ${os.getenv_opt('GHADV_AI') or { agents[0] }}')
+					tui_dialog(api.help_text() + '\n\nagent: ${os.getenv_opt('GHADV_AI') or { agents[0] }}')
 					continue
 				}
 				if k == 'C' && api.provider == 'gitlab' {

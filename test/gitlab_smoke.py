@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from urllib.parse import parse_qs, urlsplit
 
 
@@ -89,7 +90,8 @@ def stub():
         result = issues[endpoint.split('/')[1]]
     else:
         raise AssertionError((method, endpoint))
-    state_path.write_text(json.dumps(issues))
+    if method != 'GET':
+        state_path.write_text(json.dumps(issues))
     if isinstance(result, list):
         assert '--paginate' in args and args[args.index('--output') + 1] == 'ndjson'
         for item in result:
@@ -175,7 +177,60 @@ def main():
         assert 'GitHub report' in run('-r', 'https://github.com/owner/repo', 'ls')
         run('-r', 'https://github.com/owner/repo', 'cve', 'GHSA-abcd-efgh-ijkl')
         assert 'requested*' in run('-r', 'https://github.com/owner/repo', 'ls')
+        if os.name == 'posix':
+            tui_smoke(binary, root, env)
         print('Passed offline GitLab/GitHub CLI, source, mutation, recovery and local-tag checks.')
+
+
+def tui_smoke(binary, root, env):
+    import fcntl
+    import pty
+    import select
+    import struct
+    import termios
+
+    master, slave = pty.openpty()
+    fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 30, 140, 0, 0))
+    process = subprocess.Popen([binary], cwd=root, env=dict(env, TERM='xterm-256color'),
+                               stdin=slave, stdout=slave, stderr=slave, start_new_session=True)
+    os.close(slave)
+
+    def until(needle):
+        output = b''
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            if select.select([master], [], [], 0.1)[0]:
+                output += os.read(master, 65536)
+                if needle.encode() in output:
+                    return output.decode(errors='replace')
+        raise AssertionError((needle, output.decode(errors='replace')))
+
+    try:
+        until('[confidential]')
+        os.write(master, b'm')
+        menu = until('Choose a key')
+        assert 'CVE request instructions' in menu and 'p publish' not in menu
+        os.write(master, b'c')
+        until('No CVE request was submitted')
+        os.write(master, b'\x1b')
+        until('disclosures')
+        os.write(master, b'i')
+        until('Reason:')
+        os.write(master, b'Not shipped\r')
+        until('[invalid]')
+        os.write(master, b'I')
+        until('Removed local invalid tag')
+        os.write(master, b'\t')
+        until('[commits')
+        os.write(master, b'\t')
+        until('[issues/MRs')
+        os.write(master, b'q')
+        assert process.wait(timeout=10) == 0
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+        os.close(master)
 
 
 if __name__ == '__main__':

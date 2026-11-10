@@ -8,22 +8,22 @@ const help = 'Usage: ghadv [-r namespace/repo|url] [--provider github|gitlab] [-
   log                     list tagged fix commits and their advisories
   issues [label]           list labeled issues/PRs (default: GHADV_LABEL or cve)
   new <commit|url> [context] analyze a commit, issue or PR/MR with AI and create a draft
-  show <id>              print advisory
-  status <id>            show lifecycle, CVE and private report details
-  credits <id>           manage credited people and roles in the TUI
-  edit <id>              edit advisory in \$EDITOR
-  review <id> [context]  let the AI review/rewrite it, then edit
+  show <id>               print advisory
+  status <id>             show lifecycle, CVE and private report details
+  credits <id>            manage credited people and roles in the TUI
+  edit <id>               edit advisory in \$EDITOR
+  review <id> [context]   let the AI review/rewrite it, then edit
   similar <id|commit|url> [context] find similar bugs using the selection as a template
   resume <directory>       continue saved work without running the AI again
   cve <id>                 GitHub: request CVE; GitLab: show CVE request instructions
-  approve <id>           alias for cve
-  draft <id>             accept a report or reopen as a draft
-  publish <id>           publish the advisory
+  approve <id>            alias for cve
+  draft <id>              accept a report or reopen as a draft
+  publish <id>            publish the advisory
   close <id>               close the advisory/disclosure
   reopen <id>              reopen a closed advisory/disclosure
-  GitLab disclosure IDs use GL-<issue number>; publish/draft/credits are GitHub-only.
   invalid <id|commit|url> [reason] show its local tag, or mark invalid with a reason
   unmark <id|commit|url>  remove its local invalid tag
+GitLab disclosure IDs use GL-<issue number>; publish/draft/credits are GitHub-only.
 Environment:
   GHADV_PROVIDER  github or gitlab (default: detect from Git remote or source URL)
   GHADV_HOST      server hostname (custom hosts also need a provider)

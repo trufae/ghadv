@@ -32,6 +32,9 @@ fn test_gitlab_payload_confidentiality_and_supported_actions() ! {
 	assert api.actions(['GL-1', 'closed', '-', '', 'Title']) == ['c CVE request instructions', 'd reopen issue']
 	assert api.reply_instructions().contains('Use glab')
 	assert !api.reply_instructions().contains('GitHub')
+	assert !api.help_text().contains('p: publish')
+	assert api.help_text().contains('States: opened, closed')
+	assert api.help_text().contains('Confidentiality is shown separately')
 	for state in ['draft', 'published'] {
 		if _ := api.set_state('GL-1', state) { assert false, 'unsupported transition reached API' }
 	}
