@@ -105,10 +105,11 @@ fn resolve_repository(input string, provider string, host string, remote string)
 
 fn configured_repository(input string) !Repository {
 	repo := os.getenv('GHADV_REPO')
-	provider := os.getenv('GHADV_PROVIDER')
+	mut provider := os.getenv('GHADV_PROVIDER')
 	mut host := os.getenv('GHADV_HOST')
 	if host == '' && !repo.contains('://') && !repo.contains('@') && !input.contains('://') {
 		host = os.getenv(if provider == 'gitlab' { 'GITLAB_HOST' } else { 'GH_HOST' })
+		if provider == '' && host != '' { provider = 'github' }
 	}
 	if input.contains('://') {
 		s := source_url(input, provider, host)!

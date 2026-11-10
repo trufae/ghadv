@@ -36,7 +36,7 @@ def stub():
     if os.environ.get('FAIL_API'):
         sys.exit('403 Forbidden: fixture denied access')
     if client == 'gh':
-        assert host == 'github.com'
+        assert host in ['github.com', 'code.example']
         assert path.startswith('repos/owner/repo/security-advisories')
         if '?' in path:
             print('GHSA-abcd-efgh-ijkl\tdraft\t-\thigh\tGitHub report\t\t')
@@ -177,6 +177,9 @@ def main():
         assert 'GitHub report' in run('-r', 'https://github.com/owner/repo', 'ls')
         run('-r', 'https://github.com/owner/repo', 'cve', 'GHSA-abcd-efgh-ijkl')
         assert 'requested*' in run('-r', 'https://github.com/owner/repo', 'ls')
+        run('ls', overrides={'GHADV_REPO': 'owner/repo', 'GH_HOST': 'code.example'})
+        assert calls()[-1]['client'] == 'gh' and calls()[-1]['host'] == 'code.example'
+        assert 'https://code[.]example/' in calls()[-1]['args'][-1]
         if os.name == 'posix':
             tui_smoke(binary, root, env)
         print('Passed offline GitLab/GitHub CLI, source, mutation, recovery and local-tag checks.')

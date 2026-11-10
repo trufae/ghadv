@@ -5,6 +5,9 @@ import os
 import crypto.sha256
 
 fn test_gitlab_disclosure_roundtrip_and_unstructured_reports() ! {
+	// GitLab sends JSON null for absent descriptions and lifecycle timestamps.
+	nullable := json2.decode[GitLabIssue]('{"iid":1,"title":"Empty report","description":null,"closed_at":null,"merged_at":null,"merge_commit_sha":null}')!
+	assert nullable.description == '' && nullable.closed_at == '' && nullable.merged_at == ''
 	a := parse('summary: Bounds check\nseverity: high\ncvss: \ncwe: CWE-125\ncredits: alice:finder\npackage: parser\necosystem: other\naffected: < 2\npatched: 2\n---\nDetails with a code block:\n```c\nfoo();\n```\n\nCVE-2026-12345\n')!
 	issue := GitLabIssue{iid: 42, title: a.summary, description: gitlab_description(a)}
 	assert advisory_changes(a, gitlab_issue_advisory(issue)!) == []string{}
