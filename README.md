@@ -54,6 +54,12 @@ Or build only: `make` (defaults to `ghadv`), or `v -o ghadv .`. `BIN`, `PREFIX` 
 `BINDIR` are overridable; `make uninstall` and `make clean` exist. Use the same `BIN`
 value for install, uninstall and clean.
 
+The [CI workflow](.github/workflows/ci.yml) builds and tests `ghadv` on macOS and
+Alpine Linux (musl) for pushes and pull requests, and can also be run manually.
+Both jobs use the latest V source: macOS installs it with `vlang/setup-v`, while
+Alpine builds it inside an Alpine container. They run the unit tests, `--help`,
+and the offline GitHub/GitLab smoke checks with stub provider CLIs.
+
 ## Usage
 
 ```sh

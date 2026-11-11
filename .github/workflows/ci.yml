@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    name: macOS
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: vlang/setup-v@v1.7
+        with:
+          check-latest: true
+      - name: Build and test
+        run: |
+          v version
+          v -o ghadv .
+          ./ghadv --help
+          v test .
+          python3 test/gitlab_smoke.py ./ghadv
+
+  alpine:
+    name: Alpine Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      # Run JavaScript actions on the host; build with musl inside Alpine.
+      - name: Build and test
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/src" -w /src \
+            alpine:3.24 sh -ec '
+              apk add --no-cache bash build-base gc-dev git python3
+              git clone --depth 1 https://github.com/vlang/v /opt/v
+              export PATH="/opt/v:$PATH"
+              export VFLAGS="-cc gcc"
+              make -C /opt/v
+              v version
+              v -o ghadv .
+              ./ghadv --help
+              v test .
+              python3 test/gitlab_smoke.py ./ghadv
+            '
