@@ -9,7 +9,7 @@
 | `GHADV_ADVISORY_LABEL` | `security-advisory` | GitLab disclosure issue label for `ls`, the disclosures tab and `new` |
 | `GHADV_GREP` | `##(crash\|security\|vulnerability\|sandbox)` | `git log -E --grep` pattern for fix commits |
 | `GHADV_LABEL` | `cve` | label for the issues/PRs/MRs tab and `issues` command; includes open and closed items |
-| `GHADV_AI` | `claude -p` | agent command, prompt on stdin |
+| `GHADV_AI` | `claude -p` | agent command, prompt on stdin; see [progress and recovery](ai-agent.md#progress-and-recovery) |
 | `EDITOR` | `vi` | editor for drafts and reviews |
 | `PAGER` | `less` | advisory and issue/PR viewer when `r2` is not on `PATH` |
 | `XDG_STATE_HOME` | `~/.local/state` | base directory for persistent CVE request records and invalid tags |

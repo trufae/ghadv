@@ -4,12 +4,40 @@ The agent is any command that reads the prompt on stdin. Set it with `GHADV_AI`.
 
 | Value | Notes |
 | --- | --- |
-| `claude -p` | default |
-| `codex exec -` | |
-| `pmai "$(cat)"` | reads the prompt from the argument instead of stdin |
+| `claude -p` | default; ghadv enables and decodes Claude's event stream |
+| `codex exec -` | native progress on stderr |
+| `pmai --progress "$(cat)"` | progress on stderr; reads the prompt from the argument instead of stdin |
 | `opencode run "$(cat)"` | OpenCode noninteractive mode; passes the prompt as one argument |
 
 In the TUI, `A` cycles between these four presets.
+
+## Progress and recovery
+
+Agent stderr is visible immediately in CLI and TUI workflows. ghadv also prints
+an elapsed-time update every 10 seconds while the command is running, including
+when an agent is quiet. This update indicates the process is alive, not how much
+of the task it has completed. To capture feedback, redirect stderr with `2> progress.log`.
+
+For the exact `claude -p` preset (including `GHADV_AI='claude -p'`), ghadv adds
+`--output-format stream-json --verbose`. Assistant messages and tool names appear
+on stderr. The raw events are saved in `claude.jsonl`; completed top-level text
+messages are saved in `reply.txt` as recovery text while Claude works. On success,
+the final result replaces that text, so JSON events, tool output and subagent
+messages never enter the advisory. A failed or incomplete stream stops the workflow
+before opening the editor or saving to the provider. Both files survive errors
+and interruptions; `claude.jsonl` can help repair `reply.txt` before `ghadv resume`.
+Successful advisory saves clean up both files; similar-bug reports retain them.
+
+The pmai preset requires a version supporting `--progress`. To select it directly:
+
+```sh
+export GHADV_AI='pmai --progress "$(cat)"'
+```
+
+Other custom commands run exactly as configured, with stdout saved as plain text
+in `reply.txt` and stderr inherited. Use their progress/verbose options when needed;
+keep diagnostic output on stderr and the final advisory on stdout. In particular,
+custom Claude commands with extra flags are not automatically converted to JSON mode.
 
 ## What the agent sees
 

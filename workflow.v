@@ -3,8 +3,9 @@ module main
 import os
 import json2
 import rand
+import time
 
-const agents = ['claude -p', 'codex exec -', 'pmai "\$(cat)"', 'opencode run "\$(cat)"']
+const agents = ['claude -p', 'codex exec -', 'pmai --progress "\$(cat)"', 'opencode run "\$(cat)"']
 
 const reply = 'Write a self-contained advisory: readers must not need your private review notes.
 Put all useful technical findings in the Markdown description after the --- separator, including
@@ -151,7 +152,7 @@ fn resume_edit(dir string, run_ai bool) ! {
 			println('Saved changes to ${session.id} on ${api.provider}.')
 		}
 		// A resumed directory may also contain files the user added; leave those alone.
-		for name in ['session.json', 'prompt.txt', 'reply.txt', 'notes.txt', 'original.md',
+		for name in ['session.json', 'prompt.txt', 'reply.txt', 'claude.jsonl', 'notes.txt', 'original.md',
 			'proposed.md', 'review.diff', 'result.md', 'edit.md'] {
 			os.rm(os.join_path(dir, name)) or {}
 		}
@@ -249,15 +250,131 @@ fn edit(dir string, orig string) ?Adv {
 	return none
 }
 
-// Redirect output to disk from the start, including partial replies on interruption.
+// Keep stdout on disk from the start so interruption cannot discard pipe buffers.
+// stderr is inherited; Claude's structured stdout needs a separate progress reader.
 fn ask_ai(dir string) ! {
 	pf := os.join_path(dir, 'prompt.txt')
 	of := os.join_path(dir, 'reply.txt')
 	ai := os.getenv_opt('GHADV_AI') or { agents[0] }
-	println('running ${ai} ...')
-	code := sh('{ ${ai}\n} < "\$1" > "\$2"', pf, of)
-	if code != 0 {
-		return error('agent exited with status ${code}; reply saved in ${of}')
+	claude := ai == agents[0]
+	command := if claude { '${ai} --output-format stream-json --verbose' } else { ai }
+	log := if claude { os.join_path(dir, 'claude.jsonl') } else { of }
+	os.write_file(of, '')!
+	if claude { os.write_file(log, '')! }
+	mut input := os.open(log)!
+	defer { input.close() }
+	mut process := os.new_process('sh')
+	process.set_args(['-c', '{ ${command}\n} < "\$1" > "\$2"', 'sh', pf, log])
+	eprintln('running ${ai} ...')
+	mut elapsed := time.new_stopwatch()
+	process.run()
+	defer { process.close() }
+	mut stream := ClaudeStream{}
+	mut offset := u64(0)
+	mut next_update := 10
+	for {
+		alive := process.is_alive()
+		if claude {
+			for {
+				data := input.read_bytes_at(8192, offset)
+				if data.len == 0 { break }
+				offset += u64(data.len)
+				stream.feed(data.bytestr(), of, false)
+			}
+		}
+		if !alive { break }
+		seconds := int(elapsed.elapsed().seconds())
+		if seconds >= next_update {
+			eprintln('[ghadv] agent still running (${seconds}s elapsed)')
+			next_update = seconds + 10
+		}
+		time.sleep(100 * time.millisecond)
+	}
+	process.wait()
+	if claude { stream.feed('', of, true) }
+	if process.code != 0 {
+		detail := if stream.failure == '' { '' } else { '; ${stream.failure}' }
+		return error('agent exited with status ${process.code}${detail}; output saved in ${log}')
+	}
+	if claude && (stream.failure != '' || !stream.finished) {
+		reason := if stream.failure != '' { stream.failure } else { 'Claude exited without a final result' }
+		return error('${reason}; event log saved in ${log}')
+	}
+	eprintln('[ghadv] agent finished (${int(elapsed.elapsed().seconds())}s elapsed)')
+}
+
+struct ClaudeContent {
+	type string
+	text string
+	name string
+}
+
+struct ClaudeMessage {
+	content []ClaudeContent
+}
+
+struct ClaudeEvent {
+	type string
+	subtype string
+	parent_tool_use_id ?string
+	message ClaudeMessage
+	result string
+	is_error bool
+	errors []string
+}
+
+struct ClaudeStream {
+mut:
+	pending string
+	finished bool
+	failure string
+}
+
+// JSON lines can span reads, including a split UTF-8 character. Decode only whole lines.
+fn (mut stream ClaudeStream) feed(chunk string, output string, eof bool) {
+	stream.pending += chunk
+	for {
+		end := stream.pending.index('\n') or { break }
+		line := stream.pending[..end]
+		stream.pending = stream.pending[end + 1..]
+		stream.event(line, output) or { stream.failure = err.msg() }
+	}
+	if eof && stream.pending != '' {
+		stream.event(stream.pending, output) or { stream.failure = err.msg() }
+		stream.pending = ''
+	}
+}
+
+fn (mut stream ClaudeStream) event(line string, output string) ! {
+	if line.trim_space() == '' { return }
+	event := json2.decode[ClaudeEvent](line) or { return error('invalid Claude event: ${err}') }
+	match event.type {
+		'system' {
+			if event.subtype == 'init' { eprintln('[claude] session started') }
+		}
+		'assistant' {
+			for block in event.message.content {
+				if block.type == 'text' && block.text != '' {
+					if event.parent_tool_use_id == none {
+						mut file := os.open_append(output)!
+						file.write_string(block.text + '\n') or { file.close(); return err }
+						file.close()
+					}
+					eprintln(block.text)
+				} else if block.type == 'tool_use' {
+					eprintln('[claude] tool: ${block.name}')
+				}
+			}
+		}
+		'result' {
+			if event.is_error {
+				return error('Claude failed: ${event.result} ${event.errors.join('; ')}'.trim_space())
+			}
+			// The final result is authoritative; intermediate messages are only recovery text.
+			os.write_file(output, event.result)!
+			stream.finished = true
+		}
+		else {}
 	}
 }
 

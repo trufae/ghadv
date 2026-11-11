@@ -163,7 +163,7 @@ def tui_checks(binary, root):
         ui.send('\n')
         screen = ui.expect('Press Enter to return')
         assert 'Opening review.diff in editor' in screen
-        assert 'Saved changes to GHSA-test on GitHub.' in screen
+        assert 'Saved changes to GHSA-test on github.' in screen
         assert payload(root)['summary'] == 'Revised'
         assert payload(root)['description'] == 'After'
         assert '+summary: Revised' in (root / 'editor-buffer').read_text()
@@ -179,7 +179,7 @@ def tui_checks(binary, root):
         ui.expect('extra context (optional):')
         ui.send('Check the revised wording\n')
         screen = ui.expect('Press Enter to return')
-        assert 'Saved changes to GHSA-test on GitHub.' in screen
+        assert 'Saved changes to GHSA-test on github.' in screen
         prompt = json.loads((root / 'ai.prompts').read_text().splitlines()[-1])
         assert 'summary: Revised' in prompt and 'After' in prompt
         assert 'Extra context: Check the revised wording' in prompt
@@ -232,7 +232,7 @@ def tui_checks(binary, root):
         ui.send('\n')
         screen = ui.expect('Press Enter to return')
         assert 'Execution error' in screen
-        assert 'No changes saved to GitHub.' in screen
+        assert 'No changes saved to the server.' in screen
         assert 'Saved changes to' not in screen
         assert not (root / 'editor-buffer').exists()
         ui.send('\n')
@@ -311,7 +311,7 @@ def checks(binary, root):
     assert result.returncode == 0, result.stdout
     assert payload(root)['summary'] == 'Revised'
     assert payload(root)['description'] == 'After'
-    assert 'Saved changes to GHSA-test on GitHub.' in result.stdout
+    assert 'Saved changes to GHSA-test on github.' in result.stdout
     assert not saved_dir(result.stdout).exists()
 
     # Reader-facing findings and recovered credits must survive both save paths.
@@ -365,7 +365,7 @@ https://github.com/owner/repo/commit/abcdef1234'''
     # Textual changes to comments alone do not change any submitted advisory fields.
     result, _ = run(binary, root, 'comment', args=['-r', 'owner/repo', 'edit', 'GHSA-test'])
     assert result.returncode == 0, result.stdout
-    assert 'No advisory fields changed; GitHub was not updated.' in result.stdout
+    assert 'No advisory fields changed; the server was not updated.' in result.stdout
     assert 'Saved changes to' not in result.stdout
 
     # An unchanged advisory should show the AI notes and explain the lack of a PATCH.
@@ -375,7 +375,7 @@ https://github.com/owner/repo/commit/abcdef1234'''
     result, _ = run(binary, root)
     assert result.returncode == 0, result.stdout
     assert 'Verified: no changes needed' in result.stdout
-    assert 'No review changes to apply; GitHub was not updated.' in result.stdout
+    assert 'No review changes to apply; the server was not updated.' in result.stdout
     assert not (root / 'editor-buffer').exists()
     assert (root / 'payload.json').read_text() == before
     assert saved_dir(result.stdout).exists()
@@ -426,7 +426,7 @@ https://github.com/owner/repo/commit/abcdef1234'''
         result, _ = run(binary, root, mode)
         assert saved_dir(result.stdout).exists()
         assert (root / 'payload.json').read_text() == before
-        assert 'No changes saved to GitHub' in result.stdout
+        assert 'No changes saved to the server' in result.stdout
         assert 'Saved changes to' not in result.stdout
 
     # Ordinary edit/new share the recovery path and must retain their save behavior.
@@ -454,7 +454,7 @@ https://github.com/owner/repo/commit/abcdef1234'''
     # A nonzero AI exit must keep even a complete reply for a later resume.
     result, _ = run(binary, root, AI_EXIT='1')
     assert result.returncode != 0
-    assert 'No changes saved to GitHub.' in result.stdout
+    assert 'No changes saved to the server.' in result.stdout
     assert REPLY in result.stdout
     assert 'Saved changes to' not in result.stdout
     directory = saved_dir(result.stdout)

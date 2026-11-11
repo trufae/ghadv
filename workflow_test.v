@@ -1,6 +1,7 @@
 module main
 
 import os
+import json2
 
 fn test_review_diff_choices() ! {
 	orig := 'summary: Old\nseverity: high\n---\nBefore\n'
@@ -58,4 +59,41 @@ fn test_recovery_sessions_do_not_overwrite_previous_work() ! {
 	assert os.read_file(os.join_path(a, 'original.md'))! == 'original'
 	assert os.read_file(os.join_path(a, 'prompt.txt'))! == 'prompt'
 	assert os.read_file(os.join_path(b, 'original.md'))! == 'other original'
+}
+
+fn test_claude_progress_keeps_text_separate_from_events() ! {
+	dir := start_edit(Repository{repo: 'owner/repo'}, 'GHSA-test', 'review', '', '')!
+	defer { os.rmdir_all(dir) or {} }
+	path := os.join_path(dir, 'reply.txt')
+	os.write_file(path, '')!
+	mut stream := ClaudeStream{}
+	partial := '{"type":"assistant","parent_tool_use_id":null,"message":{"content":[{"type":"thinking","thinking":"private"},{"type":"text","text":"Checking café"},{"type":"tool_use","name":"Read","input":{"file_path":"parser.c"}}]}}\n'
+	for byte in partial.bytes() {
+		stream.feed([byte].bytestr(), path, false)
+	}
+	assert stream.failure == ''
+	assert os.read_file(path)! == 'Checking café\n'
+	stream.feed('{"type":"assistant","parent_tool_use_id":"child","message":{"content":[{"type":"text","text":"child notes"}]}}\n', path, false)
+	assert os.read_file(path)! == 'Checking café\n'
+	final := 'summary: Final\n---\nVerified café\n'
+	// A short-lived child may leave its last event without a trailing newline.
+	stream.feed('{"type":"result","is_error":false,"result":${json2.encode(final)}}', path, true)
+	assert stream.failure == ''
+	assert stream.finished
+	assert os.read_file(path)! == final
+}
+
+fn test_claude_errors_retain_partial_reply() ! {
+	dir := start_edit(Repository{repo: 'owner/repo'}, 'GHSA-test', 'review', '', '')!
+	defer { os.rmdir_all(dir) or {} }
+	path := os.join_path(dir, 'reply.txt')
+	os.write_file(path, 'partial review')!
+	mut stream := ClaudeStream{}
+	stream.feed('{"type":"result","is_error":true,"errors":["request failed"]}\n', path, true)
+	assert stream.failure.contains('request failed')
+	assert !stream.finished
+	assert os.read_file(path)! == 'partial review'
+	stream.feed('not JSON\n', path, true)
+	assert stream.failure.contains('invalid Claude event')
+	assert os.read_file(path)! == 'partial review'
 }

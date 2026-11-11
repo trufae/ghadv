@@ -211,5 +211,6 @@ Tabs occupy the second row, with the active view in brackets and the advisory st
 and issue label shown when space permits. Narrow windows omit counts and filters before
 falling back to the active tab; short windows prioritize the tab row over repository details.
 Pressing `A`
-cycles through `claude -p`, `codex exec -` and `pmai "$(cat)"`; a custom `GHADV_AI` is
+cycles through `claude -p`, `codex exec -`, `pmai --progress "$(cat)"` and
+`opencode run "$(cat)"`; a custom `GHADV_AI` is
 replaced by the first preset. The selected agent appears in the status line and `?` help.

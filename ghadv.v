@@ -33,7 +33,8 @@ Environment:
   GHADV_GREP   git log -E --grep for fix commits (default: ##(crash|security|vulnerability|sandbox))
   GHADV_LABEL  issues/PRs label (default: cve; includes open and closed items)
   GHADV_AI     agent command, prompt is piped to stdin (default: claude -p)
-               e.g. "codex exec -", \'pmai "\$(cat)"\', \'opencode run "\$(cat)"\''
+               progress goes to stderr; replies are saved for recovery
+               e.g. "codex exec -", \'pmai --progress "\$(cat)"\', \'opencode run "\$(cat)"\''
 
 fn issue_label(label string) string {
 	if label != '' {
