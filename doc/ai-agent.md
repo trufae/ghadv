@@ -19,9 +19,23 @@ when an agent is quiet. This update indicates the process is alive, not how much
 of the task it has completed. To capture feedback, redirect stderr with `2> progress.log`.
 
 For the exact `claude -p` preset (including `GHADV_AI='claude -p'`), ghadv adds
-`--output-format stream-json --verbose`. Assistant messages and tool names appear
-on stderr. The raw events are saved in `claude.jsonl`; completed top-level text
-messages are saved in `reply.txt` as recovery text while Claude works. On success,
+`--output-format stream-json --verbose`. Assistant messages and tool activity appear
+on stderr, including Bash commands and descriptions, file paths, search patterns,
+URLs and subagent tasks. For example:
+
+```text
+[claude] tool: Bash
+  description: "Inspect the fix"
+  command: "git show --stat HEAD"
+[claude] tool: Read
+  file_path: "src/parser.c"
+```
+
+Arguments are JSON-quoted so multiline commands and control characters remain
+readable, with each argument preview limited to 1,000 characters. File contents
+and replacement text are omitted from progress. The full raw events are saved
+in `claude.jsonl`; completed top-level text messages are saved in `reply.txt` as
+recovery text while Claude works. On success,
 the final result replaces that text, so JSON events, tool output and subagent
 messages never enter the advisory. A failed or incomplete stream stops the workflow
 before opening the editor or saving to the provider. Both files survive errors

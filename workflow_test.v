@@ -97,3 +97,18 @@ fn test_claude_errors_retain_partial_reply() ! {
 	assert stream.failure.contains('invalid Claude event')
 	assert os.read_file(path)! == 'partial review'
 }
+
+fn test_claude_tool_progress_quotes_controls_and_bounds_unicode() ! {
+	command := 'printf "café"\n\tprintf "\\n"\r\x1b[2J'
+	block := json2.decode[ClaudeContent]('{"type":"tool_use","name":"Bash","input":{"command":${json2.encode(command)}}}')!
+	progress := claude_tool_progress(block)
+	assert progress.split_into_lines().len == 2
+	assert !progress.contains('\x1b') && !progress.contains('\r') && !progress.contains('\t')
+	assert progress.contains(json2.encode(command))
+	long := json2.decode[ClaudeContent]('{"type":"tool_use","name":"Bash","input":{"command":${json2.encode('界'.repeat(1100))}}}')!
+	preview := claude_tool_progress(long).all_after('  command: ')
+	assert preview == '"' + '界'.repeat(996) + '...'
+	// Input-less and unfamiliar tools must not break stream decoding.
+	unknown := json2.decode[ClaudeContent]('{"type":"tool_use","name":"Custom"}')!
+	assert claude_tool_progress(unknown) == '[claude] tool: Custom'
+}

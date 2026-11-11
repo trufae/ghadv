@@ -111,8 +111,9 @@ Configuration lives in `GHADV_REPO`, `GHADV_LABEL`, `GHADV_AI`, `GHADV_GREP`, pl
 and `$PAGER`. See [doc/configuration.md](doc/configuration.md).
 
 AI workflows show live progress on stderr and an elapsed-time update every 10 seconds.
-The Claude preset shows messages and tool activity; Codex uses its native stderr output,
-and the pmai preset uses `--progress` (requires a pmai version with that option).
+The Claude preset shows messages, Bash commands and descriptions, file paths and search
+arguments; Codex uses its native stderr output, and the pmai preset uses `--progress`
+(requires a pmai version with that option).
 Replies stay separate in the recovery directory for review and editing. See
 [AI progress and recovery](doc/ai-agent.md#progress-and-recovery).
 

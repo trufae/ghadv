@@ -307,6 +307,7 @@ struct ClaudeContent {
 	type string
 	text string
 	name string
+	input map[string]json2.Any
 }
 
 struct ClaudeMessage {
@@ -328,6 +329,22 @@ mut:
 	pending string
 	finished bool
 	failure string
+}
+
+// Show the operation without dumping file contents or replacement text. JSON
+// quoting preserves multiline commands and keeps terminal controls inert.
+fn claude_tool_progress(block ClaudeContent) string {
+	mut lines := ['[claude] tool: ${block.name}']
+	for key in ['description', 'command', 'file_path', 'notebook_path', 'path', 'pattern',
+		'glob', 'url', 'query', 'subagent_type', 'prompt', 'offset', 'limit'] {
+		value := block.input[key] or { continue }
+		if value is string && value.trim_space() == '' { continue }
+		text := json2.encode(value)
+		chars := text.runes()
+		preview := if chars.len > 1000 { chars[..997].string() + '...' } else { text }
+		lines << '  ${key}: ${preview}'
+	}
+	return lines.join('\n')
 }
 
 // JSON lines can span reads, including a split UTF-8 character. Decode only whole lines.
@@ -362,7 +379,7 @@ fn (mut stream ClaudeStream) event(line string, output string) ! {
 					}
 					eprintln(block.text)
 				} else if block.type == 'tool_use' {
-					eprintln('[claude] tool: ${block.name}')
+					eprintln(claude_tool_progress(block))
 				}
 			}
 		}

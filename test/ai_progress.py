@@ -32,6 +32,17 @@ def stub():
             {'type': 'system', 'subtype': 'init'},
             {'type': 'assistant', 'parent_tool_use_id': None, 'message': {'content': [
                 {'type': 'text', 'text': 'Checking the café fixture'},
+                {'type': 'tool_use', 'name': 'Bash', 'input': {
+                    'description': 'Inspect the fix', 'command': 'git show --stat HEAD',
+                    'timeout': 120000, 'run_in_background': False,
+                }},
+                {'type': 'tool_use', 'name': 'Grep', 'input': {
+                    'pattern': 'parse.*header', 'path': 'src', 'glob': '*.c',
+                }},
+                {'type': 'tool_use', 'name': 'Edit', 'input': {
+                    'file_path': 'fixture.c', 'old_string': 'old implementation',
+                    'new_string': 'replacement implementation',
+                }},
                 {'type': 'tool_use', 'name': 'Read', 'input': {'file_path': 'fixture.c'}},
             ]}},
         ]
@@ -84,7 +95,7 @@ def main():
                 env['GHADV_AI'] = agent
             claude = agent in (None, 'claude -p')
             marker = (b'agent still running (' if mode == 'quiet' else
-                      b'[claude] tool: Read' if claude else b'Checking the fixture live')
+                      b'[claude] tool: Read\n  file_path: "fixture.c"' if claude else b'Checking the fixture live')
             with (root / 'stdout').open('w+') as output:
                 process = subprocess.Popen([binary, '-r', 'owner/repo', 'review', 'GHSA-test'],
                     cwd=root, env=env, stdin=subprocess.DEVNULL, stdout=output,
@@ -118,6 +129,15 @@ def main():
                 output.seek(0)
                 stdout = output.read()
                 stderr = log.decode(errors='replace')
+                if claude:
+                    assert '[claude] tool: Bash\n  description: "Inspect the fix"\n  command: "git show --stat HEAD"' in stderr
+                    assert 'pattern: "parse.*header"' in stderr and 'path: "src"' in stderr
+                    assert 'glob: "*.c"' in stderr
+                    assert 'replacement implementation' not in stderr and 'old implementation' not in stderr
+                    assert 'git show --stat HEAD' not in stdout
+                    if directory.exists():
+                        assert 'git show --stat HEAD' not in (directory / 'reply.txt').read_text()
+                        assert 'replacement implementation' in (directory / 'claude.jsonl').read_text()
                 if mode in ('missing', 'malformed', 'error', 'nonzero', 'interrupt'):
                     assert process.returncode != 0, stderr
                     assert not (root / 'editor-buffer').exists()
