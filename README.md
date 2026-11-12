@@ -42,9 +42,17 @@ state/visibility differences, CVE tracking and limitations.
 
 ## Install
 
-Requires [V](https://vlang.io), `git`, and the authenticated CLI for your provider:
+Requires `git` and the authenticated CLI for your provider:
 `gh` with **Repository security advisories: write** for GitHub, or `glab` with access
 to the project issues for GitLab. GitLab Ultimate is not required.
+
+Download a platform archive from [Releases](https://github.com/trufae/gsadv/releases),
+extract it, and install the `gsadv` executable somewhere on `PATH` (for example,
+`install -m 755 gsadv ~/.local/bin/gsadv` after creating `~/.local/bin`).
+Archives include the executable, version and documentation; `SHA256SUMS` lists their
+checksums. The Linux musl executable is statically linked.
+
+To build from source, install [V](https://vlang.io), then:
 
 ```sh
 git clone https://github.com/trufae/gsadv.git && cd gsadv
@@ -60,10 +68,24 @@ The first release reports `gsadv 0.1.0`; version and help work without a reposit
 or provider CLI. Builds embed the version from [VERSION](VERSION).
 
 The [CI workflow](.github/workflows/ci.yml) builds and tests `gsadv` on macOS and
-Alpine Linux (musl) for pushes and pull requests, and can also be run manually.
+Alpine Linux (musl) for branch pushes and pull requests, and can also be run manually.
 Both jobs use the latest V source: macOS installs it with `vlang/setup-v`, while
-Alpine builds it inside an Alpine container. They run the unit tests, `--help`,
+Alpine builds it inside an Alpine container. They run the unit tests, `--help`, `--version`,
 and the offline GitHub/GitLab smoke checks with stub provider CLIs.
+Each successful platform job uploads its `.tar.gz` package as a CI artifact; filenames
+include the platform and architecture (`gsadv-macos-arm64.tar.gz` and
+`gsadv-linux-musl-x86_64.tar.gz` on the current runners).
+
+Pushing any tag starting with a digit (for example, `0.1.0`) runs the same checks and,
+after both platform jobs pass, creates a GitHub release with all platform archives,
+checksums and generated release notes. Branch pushes, pull requests and manual runs
+upload CI artifacts without publishing a release. To release, update `VERSION`, commit
+the changes, then tag and push that commit:
+
+```sh
+git tag -a 0.1.0 -m 'Release 0.1.0'
+git push origin main 0.1.0
+```
 
 ## Usage
 

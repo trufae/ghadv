@@ -2,6 +2,8 @@ name: CI
 
 on:
   push:
+    branches: ['**']
+    tags: ['[0-9]**']
   pull_request:
   workflow_dispatch:
 
@@ -21,10 +23,18 @@ jobs:
       - name: Build and test
         run: |
           v version
-          v -o gsadv .
+          v -prod -o gsadv .
           ./gsadv --help
+          ./gsadv --version
           v test .
           python3 test/gitlab_smoke.py ./gsadv
+      - name: Package
+        run: tar -czf "gsadv-macos-$(uname -m).tar.gz" gsadv VERSION README.md doc
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gsadv-macos
+          path: gsadv-macos-*.tar.gz
+          if-no-files-found: error
 
   alpine:
     name: Alpine Linux
@@ -38,14 +48,54 @@ jobs:
           docker run --rm \
             -v "$GITHUB_WORKSPACE:/src" -w /src \
             alpine:3.24 sh -ec '
-              apk add --no-cache bash build-base gc-dev git python3
+              apk add --no-cache bash build-base gc-dev gc-static git python3
               git clone --depth 1 https://github.com/vlang/v /opt/v
               export PATH="/opt/v:$PATH"
               export VFLAGS="-cc gcc"
               make -C /opt/v
               v version
-              v -o gsadv .
+              v -prod -cflags -static -o gsadv .
               ./gsadv --help
+              ./gsadv --version
               v test .
               python3 test/gitlab_smoke.py ./gsadv
             '
+      - name: Package
+        run: tar -czf "gsadv-linux-musl-$(uname -m).tar.gz" gsadv VERSION README.md doc
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gsadv-linux-musl
+          path: gsadv-linux-musl-*.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    needs: [macos, alpine]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: gsadv-*
+          merge-multiple: true
+          path: dist
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum *.tar.gz > SHA256SUMS
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          name: gsadv ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/gsadv-macos-*.tar.gz
+            dist/gsadv-linux-musl-*.tar.gz
+            dist/SHA256SUMS
