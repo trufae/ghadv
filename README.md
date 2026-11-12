@@ -40,6 +40,11 @@ to `gsadv`; configuration now uses `GSADV_*`, with `GHADV_*` aliases still suppo
 See the [GitLab guide](doc/gitlab.md) for setup,
 state/visibility differences, CVE tracking and limitations.
 
+Codeberg is not supported yet. It has [API and CLI access through `tea` or `fj`](https://docs.codeberg.org/git/clone-commit-via-cli/#cli-clients-tea-and-fj-for-other-actions),
+but its [current API schema](https://codeberg.org/swagger.v1.json) exposes neither
+repository security advisories nor confidential issues. General issue access alone
+does not provide the private disclosure workflow used by gsadv.
+
 ## Install
 
 Requires `git` and the authenticated CLI for your provider:
