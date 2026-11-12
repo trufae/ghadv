@@ -6,6 +6,7 @@ its workflow and platform differences. `<id>` means `GHSA-…` on GitHub or `GL-
 
 ```
 gsadv [-r namespace/repo|url] [--provider github|gitlab] [--host hostname] [--remote name] [command] [args]
+  --version, -v, version   print the tool version
   tui [label]              advisory, commit and labeled issues/PRs tabs (default)
   ls [state]               GitHub advisories or GitLab disclosure issues (opened/closed)
   log                     list tagged fix commits and their advisories

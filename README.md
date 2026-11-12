@@ -55,6 +55,10 @@ Or build only: `make` (defaults to `gsadv`), or `v -o gsadv .`. `BIN`, `PREFIX` 
 `BINDIR` are overridable; `make uninstall` and `make clean` exist. Use the same `BIN`
 value for install, uninstall and clean.
 
+Check the installed version with `gsadv --version` (also `-v` or `version`).
+The first release reports `gsadv 0.1.0`; version and help work without a repository
+or provider CLI. Builds embed the version from [VERSION](VERSION).
+
 The [CI workflow](.github/workflows/ci.yml) builds and tests `gsadv` on macOS and
 Alpine Linux (musl) for pushes and pull requests, and can also be run manually.
 Both jobs use the latest V source: macOS installs it with `vlang/setup-v`, while

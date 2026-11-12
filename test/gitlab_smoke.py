@@ -104,6 +104,14 @@ def main():
     binary = str(Path(sys.argv[1]).resolve())
     with tempfile.TemporaryDirectory(prefix='gsadv-gitlab-smoke-') as directory:
         root = Path(directory)
+        version = (Path(__file__).resolve().parents[1] / 'VERSION').read_text().strip()
+        for option in ['--version', '-v', 'version']:
+            # No Git checkout or provider CLI; invalid settings must not be consulted.
+            result = subprocess.run([binary, option], cwd=root,
+                                    env=dict(os.environ, PATH=str(root), GSADV_PROVIDER='invalid'),
+                                    capture_output=True, text=True, timeout=5)
+            assert result.returncode == 0 and result.stdout == f'gsadv {version}\n', result
+            assert result.stderr == '', result.stderr
         bindir = root / 'bin'
         bindir.mkdir()
         for name in ['glab', 'gh', 'agent', 'r2']:

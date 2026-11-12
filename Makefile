@@ -5,7 +5,7 @@ BIN = gsadv
 
 all: $(BIN)
 
-$(BIN): $(SRC)
+$(BIN): $(SRC) VERSION
 	v -o $(BIN) .
 
 install: $(BIN)

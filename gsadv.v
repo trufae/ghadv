@@ -2,12 +2,15 @@ module main
 
 import os
 
+const version = $embed_file('VERSION').to_string().trim_space()
+
 // Prefer the current name, including explicitly empty settings, then legacy aliases.
 fn setting(name string) ?string {
 	return os.getenv_opt('GSADV_${name}') or { return os.getenv_opt('GHADV_${name}') }
 }
 
 const help = 'Usage: gsadv [-r namespace/repo|url] [--provider github|gitlab] [--host hostname] [--remote name] [command] [args]
+  --version, -v, version   print the tool version
   tui [label]              advisory, commit and labeled issues/PRs tabs (default)
   ls [state]               GitHub advisories or GitLab disclosure issues (opened/closed)
   log                     list tagged fix commits and their advisories
@@ -64,6 +67,10 @@ fn main() {
 	}
 	if args.len > 0 && args[0] in ['-h', '--help', 'help'] {
 		println(help)
+		return
+	}
+	if args.len > 0 && args[0] in ['-v', '--version', 'version'] {
+		println('gsadv ${version}')
 		return
 	}
 	cmd := if args.len > 0 { args[0] } else { 'tui' }
