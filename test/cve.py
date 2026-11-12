@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check CVE request receipts across CLI/TUI restarts using stub gh/git commands.
 
-Usage: python3 test/cve.py /path/to/ghadv
+Usage: python3 test/cve.py /path/to/gsadv
 """
 
 import json
@@ -176,6 +176,6 @@ def checks(binary, root):
 
 if __name__ == '__main__':
     binary = str(Path(sys.argv[1]).resolve())
-    with tempfile.TemporaryDirectory(prefix='ghadv-cve-test-') as tmp:
+    with tempfile.TemporaryDirectory(prefix='gsadv-cve-test-') as tmp:
         checks(binary, Path(tmp))
     print('CVE request persistence checks passed')

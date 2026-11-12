@@ -30,7 +30,7 @@ advisory where it belongs. Notes and header comments are discarded when saving t
 Keep any leading notes brief and editorial (verdict and change summary only), then put the advisory
 last in your reply, in exactly this format and without wrapping it in code fences:\n\n${format}'
 
-// runs a user configured shell command ($EDITOR, $GHADV_AI..) with $1.. bound to args
+// runs a user configured shell command ($EDITOR, $GSADV_AI..) with $1.. bound to args
 fn sh(cmd string, args ...string) int {
 	return os.system_args(['sh', '-c', cmd, 'sh', ...args])
 }
@@ -48,7 +48,7 @@ fn C._exit(int)
 
 // Keep each attempt separate, including repeated reviews of the same advisory.
 fn start_edit(api Repository, id string, kind string, orig string, prompt string) !string {
-	dir := os.join_path(os.temp_dir(), 'ghadv-${rand.ulid()}')
+	dir := os.join_path(os.temp_dir(), 'gsadv-${rand.ulid()}')
 	os.mkdir(dir, mode: 0o700)!
 	os.write_file(os.join_path(dir, 'session.json'), json2.encode(EditSession{repo: api.repo, id: id, kind: kind, provider: api.provider, host: api.host, advisory_label: gitlab_advisory_label()}))!
 	os.write_file(os.join_path(dir, 'original.md'), orig)!
@@ -58,7 +58,7 @@ fn start_edit(api Repository, id string, kind string, orig string, prompt string
 
 fn interrupt_edit(_ os.Signal) {
 	// The path is printed before starting any work. Avoid allocation in the handler.
-	os.fd_write(2, '\nInterrupted. Saved work is in the recovery directory printed above; use ghadv resume to continue.\n')
+	os.fd_write(2, '\nInterrupted. Saved work is in the recovery directory printed above; use gsadv resume to continue.\n')
 	C._exit(130)
 }
 
@@ -69,7 +69,7 @@ fn resume_edit(dir string, run_ai bool) ! {
 		|| (session.kind != 'new' && session.id == '') {
 		return error('invalid recovery session: ${dir}')
 	}
-	println('Recovery files: ${dir}\nResume without AI: ghadv resume ${os.quoted_path(dir)}')
+	println('Recovery files: ${dir}\nResume without AI: gsadv resume ${os.quoted_path(dir)}')
 	os.flush()
 	previous := os.signal_opt(.int, interrupt_edit)!
 	defer {
@@ -130,7 +130,7 @@ fn resume_edit(dir string, run_ai bool) ! {
 	}
 	host := if session.host != '' { session.host } else if os.getenv('GH_HOST') != '' { os.getenv('GH_HOST') } else { 'github.com' }
 	api := repository_location('https://${host}/${session.repo}', session.provider, host)!
-	if session.advisory_label != '' { os.setenv('GHADV_ADVISORY_LABEL', session.advisory_label, true) }
+	if session.advisory_label != '' { os.setenv('GSADV_ADVISORY_LABEL', session.advisory_label, true) }
 	for {
 		a := edit(dir, orig) or {
 			println('No changes saved to the server; recovery files kept in ${dir}')
@@ -255,7 +255,7 @@ fn edit(dir string, orig string) ?Adv {
 fn ask_ai(dir string) ! {
 	pf := os.join_path(dir, 'prompt.txt')
 	of := os.join_path(dir, 'reply.txt')
-	ai := os.getenv_opt('GHADV_AI') or { agents[0] }
+	ai := setting('AI') or { agents[0] }
 	claude := ai == agents[0]
 	command := if claude { '${ai} --output-format stream-json --verbose' } else { ai }
 	log := if claude { os.join_path(dir, 'claude.jsonl') } else { of }
@@ -285,7 +285,7 @@ fn ask_ai(dir string) ! {
 		if !alive { break }
 		seconds := int(elapsed.elapsed().seconds())
 		if seconds >= next_update {
-			eprintln('[ghadv] agent still running (${seconds}s elapsed)')
+			eprintln('[gsadv] agent still running (${seconds}s elapsed)')
 			next_update = seconds + 10
 		}
 		time.sleep(100 * time.millisecond)
@@ -300,7 +300,7 @@ fn ask_ai(dir string) ! {
 		reason := if stream.failure != '' { stream.failure } else { 'Claude exited without a final result' }
 		return error('${reason}; event log saved in ${log}')
 	}
-	eprintln('[ghadv] agent finished (${int(elapsed.elapsed().seconds())}s elapsed)')
+	eprintln('[gsadv] agent finished (${int(elapsed.elapsed().seconds())}s elapsed)')
 }
 
 struct ClaudeContent {
@@ -416,7 +416,7 @@ fn ai_reply(out string) !(string, string) {
 
 // unified diff of the whole text, preceded by free text notes
 fn udiff(notes string, a string, b string) !string {
-	fa := os.join_path(os.temp_dir(), 'ghadv-a-${os.getpid()}')
+	fa := os.join_path(os.temp_dir(), 'gsadv-a-${os.getpid()}')
 	fb := fa.replace('-a-', '-b-')
 	os.write_file(fa, a)!
 	os.write_file(fb, b)!

@@ -241,7 +241,7 @@ Commit circles use linked advisory severity or a keyword estimate from the subje
 States: triage (private report), draft, published, closed.
 CVE assignment is separate from the advisory state and happens asynchronously.
 Use s to check the assigned CVE; GitHub REST does not expose pending requests.
-requested* means ghadv recorded an accepted request locally, across restarts.
+requested* means gsadv recorded an accepted request locally, across restarts.
 It is not a live queue status; s shows when the request was accepted.'
 
 fn color(state string, s string) string {
@@ -479,7 +479,7 @@ fn advisory_tui(api Repository, id string, first string) ! {
 }
 
 fn view_text(text string) ! {
-	path := os.join_path(os.temp_dir(), 'ghadv-view-${os.getpid()}.md')
+	path := os.join_path(os.temp_dir(), 'gsadv-view-${os.getpid()}.md')
 	os.write_file(path, text)!
 	defer { os.rm(path) or {} }
 	if os.exists_in_system_path('r2') {
@@ -829,7 +829,7 @@ fn tui(initial_api Repository, label string) {
 			// A late load failure must not hide an action result or cancellation.
 			if result.error != '' && status == '' {
 				status = '${result.kind}: ' + result.error.replace('\n', ' ')
-				if result.kind == .repository { status += '; use -r owner/repo or GHADV_REPO, g retries' }
+				if result.kind == .repository { status += '; use -r owner/repo or GSADV_REPO, g retries' }
 			}
 			match result.kind {
 				.repository {
@@ -916,7 +916,7 @@ fn tui(initial_api Repository, label string) {
 			if !loaded[v] { tabs[v] += if v != 1 && api.repo == '' && !repo_pending { ' unavailable' } else { ' loading...' } }
 		}
 		repo_name := if api.repo != '' { api.repo } else if repo_pending { 'resolving repository...' } else { 'repository unavailable' }
-		header := 'ghadv ${api.provider}:${api.host}/${repo_name} | local git: ${git_status}'
+		header := 'gsadv ${api.provider}:${api.host}/${repo_name} | local git: ${git_status}'
 		tab_line := tui_tabs(tabs, view, width)
 		columns := if w < 40 {
 			if view == 0 { 'SUMMARY' } else if view == 1 { 'SUBJECT' } else { 'NUMBER TITLE' }
@@ -937,7 +937,7 @@ fn tui(initial_api Repository, label string) {
 		}
 		if n == 0 {
 			body << term.dim(if !loaded[view] && view != 1 && api.repo == '' && !repo_pending {
-				'Cannot find repository. Use -r owner/repo or GHADV_REPO; g retries.'
+				'Cannot find repository. Use -r owner/repo or GSADV_REPO; g retries.'
 			} else if !loaded[view] {
 				'Loading... You can switch tabs or quit while requests run.'
 			} else if queries[view] != '' {
@@ -1052,10 +1052,10 @@ fn tui(initial_api Repository, label string) {
 				}
 			}
 			'A' {
-				// cycle the agent; a custom GHADV_AI is replaced by the presets
-				cur := agents.index(os.getenv_opt('GHADV_AI') or { agents[0] })
-				os.setenv('GHADV_AI', agents[(cur + 1) % agents.len], true)
-				status = 'agent: ${os.getenv('GHADV_AI')}'
+				// cycle the agent; a custom GSADV_AI is replaced by the presets
+				cur := agents.index(setting('AI') or { agents[0] })
+				os.setenv('GSADV_AI', agents[(cur + 1) % agents.len], true)
+				status = 'agent: ${os.getenv('GSADV_AI')}'
 			}
 			'g' {
 				if api.repo != '' {
@@ -1101,7 +1101,7 @@ fn tui(initial_api Repository, label string) {
 				}
 				screen.width = 0
 				if k == '?' {
-					tui_dialog(api.help_text() + '\n\nagent: ${os.getenv_opt('GHADV_AI') or { agents[0] }}')
+					tui_dialog(api.help_text() + '\n\nagent: ${setting('AI') or { agents[0] }}')
 					continue
 				}
 				if k == 'C' && api.provider == 'gitlab' {

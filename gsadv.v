@@ -2,11 +2,16 @@ module main
 
 import os
 
-const help = 'Usage: ghadv [-r namespace/repo|url] [--provider github|gitlab] [--host hostname] [--remote name] [command] [args]
+// Prefer the current name, including explicitly empty settings, then legacy aliases.
+fn setting(name string) ?string {
+	return os.getenv_opt('GSADV_${name}') or { return os.getenv_opt('GHADV_${name}') }
+}
+
+const help = 'Usage: gsadv [-r namespace/repo|url] [--provider github|gitlab] [--host hostname] [--remote name] [command] [args]
   tui [label]              advisory, commit and labeled issues/PRs tabs (default)
   ls [state]               GitHub advisories or GitLab disclosure issues (opened/closed)
   log                     list tagged fix commits and their advisories
-  issues [label]           list labeled issues/PRs (default: GHADV_LABEL or cve)
+  issues [label]           list labeled issues/PRs (default: GSADV_LABEL or cve)
   new <commit|url> [context] analyze a commit, issue or PR/MR with AI and create a draft
   show <id>               print advisory
   status <id>             show lifecycle, CVE and private report details
@@ -25,14 +30,14 @@ const help = 'Usage: ghadv [-r namespace/repo|url] [--provider github|gitlab] [-
   unmark <id|commit|url>  remove its local invalid tag
 GitLab disclosure IDs use GL-<issue number>; publish/draft/credits are GitHub-only.
 Environment:
-  GHADV_PROVIDER  github or gitlab (default: detect from Git remote or source URL)
-  GHADV_HOST      server hostname (custom hosts also need a provider)
-  GHADV_REMOTE    Git remote to use instead of upstream/origin
-  GHADV_ADVISORY_LABEL  GitLab disclosure label (default: security-advisory)
-  GHADV_REPO   default repository (otherwise taken from the cwd checkout)
-  GHADV_GREP   git log -E --grep for fix commits (default: ##(crash|security|vulnerability|sandbox))
-  GHADV_LABEL  issues/PRs label (default: cve; includes open and closed items)
-  GHADV_AI     agent command, prompt is piped to stdin (default: claude -p)
+  GSADV_PROVIDER  github or gitlab (default: detect from Git remote or source URL)
+  GSADV_HOST      server hostname (custom hosts also need a provider)
+  GSADV_REMOTE    Git remote to use instead of upstream/origin
+  GSADV_ADVISORY_LABEL  GitLab disclosure label (default: security-advisory)
+  GSADV_REPO   default repository (otherwise taken from the cwd checkout)
+  GSADV_GREP   git log -E --grep for fix commits (default: ##(crash|security|vulnerability|sandbox))
+  GSADV_LABEL  issues/PRs label (default: cve; includes open and closed items)
+  GSADV_AI     agent command, prompt is piped to stdin (default: claude -p)
                progress goes to stderr; replies are saved for recovery
                e.g. "codex exec -", \'pmai --progress "\$(cat)"\', \'opencode run "\$(cat)"\''
 
@@ -40,7 +45,7 @@ fn issue_label(label string) string {
 	if label != '' {
 		return label
 	}
-	configured := os.getenv('GHADV_LABEL')
+	configured := setting('LABEL') or { '' }
 	return if configured != '' { configured } else { 'cve' }
 }
 
@@ -49,10 +54,10 @@ fn main() {
 	for args.len > 0 && args[0] in ['-r', '--provider', '--host', '--remote'] {
 		if args.len < 2 { eprintln('missing value for ${args[0]}'); exit(1) }
 		name := match args[0] {
-			'-r' { 'GHADV_REPO' }
-			'--provider' { 'GHADV_PROVIDER' }
-			'--host' { 'GHADV_HOST' }
-			else { 'GHADV_REMOTE' }
+			'-r' { 'GSADV_REPO' }
+			'--provider' { 'GSADV_PROVIDER' }
+			'--host' { 'GSADV_HOST' }
+			else { 'GSADV_REMOTE' }
 		}
 		os.setenv(name, args[1], true)
 		args = args[2..].clone()
@@ -66,7 +71,7 @@ fn main() {
 	ctx := if args.len > 2 { args[2..].join(' ') } else { '' }
 	if cmd == 'resume' {
 		if id == '' {
-			eprintln('usage: ghadv resume <recovery-directory>')
+			eprintln('usage: gsadv resume <recovery-directory>')
 			exit(1)
 		}
 		resume_edit(os.real_path(id), false) or {

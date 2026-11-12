@@ -76,23 +76,23 @@ def main():
     from workflow import REPLY, setup, saved_dir
 
     binary = str(Path(sys.argv[1]).resolve())
-    with tempfile.TemporaryDirectory(prefix='ghadv-progress-test-') as tmp, ExitStack() as cleanup:
+    with tempfile.TemporaryDirectory(prefix='gsadv-progress-test-') as tmp, ExitStack() as cleanup:
         root = Path(tmp)
         setup(root)
         for name in ('claude', 'codex', 'pmai'):
             path = root / name
             path.write_text(f'#!{sys.executable}\n' + Path(__file__).read_text().split('\n', 1)[1])
             path.chmod(0o700)
-        base = {k: v for k, v in os.environ.items() if not k.startswith('GHADV_') and k not in ('GH_HOST', 'GITLAB_HOST')}
+        base = {k: v for k, v in os.environ.items() if not k.startswith(('GSADV_', 'GHADV_')) and k not in ('GH_HOST', 'GITLAB_HOST')}
         base.update(PATH=str(root) + os.pathsep + base['PATH'], TEST_ROOT=str(root), TMPDIR=str(root),
-                    GHADV_PROVIDER='github', EDITOR='editor', EDITOR_MODE='fail')
+                    GSADV_PROVIDER='github', EDITOR='editor', EDITOR_MODE='fail')
 
         def check(agent=None, mode='', save=False):
             for name in ('agent-release', 'editor-buffer', 'payload.json', 'saved.json'):
                 (root / name).unlink(missing_ok=True)
             env = base | {'AGENT_MODE': mode, 'EDITOR_MODE': '' if save else 'fail'}
             if agent is not None:
-                env['GHADV_AI'] = agent
+                env['GSADV_AI'] = agent
             claude = agent in (None, 'claude -p')
             marker = (b'agent still running (' if mode == 'quiet' else
                       b'[claude] tool: Read\n  file_path: "fixture.c"' if claude else b'Checking the fixture live')
@@ -150,7 +150,7 @@ def main():
                         assert process.returncode == 130 and 'Interrupted.' in stderr
                         (directory / 'reply.txt').write_text(REPLY)
                         resumed = subprocess.run([binary, 'resume', str(directory)], cwd=root,
-                            env=base | {'EDITOR_MODE': '', 'GHADV_AI': 'false'}, capture_output=True, timeout=10)
+                            env=base | {'EDITOR_MODE': '', 'GSADV_AI': 'false'}, capture_output=True, timeout=10)
                         assert resumed.returncode == 0, resumed.stderr
                         assert not directory.exists()
                 else:
@@ -164,7 +164,7 @@ def main():
                     else:
                         assert (directory / 'reply.txt').read_text() == REPLY
 
-        check(save=True)  # Unset GHADV_AI uses Claude streaming and cleans up the raw log.
+        check(save=True)  # Unset GSADV_AI uses Claude streaming and cleans up the raw log.
         check('claude -p')
         for mode in ('missing', 'malformed', 'error', 'nonzero', 'interrupt'):
             check('claude -p', mode)

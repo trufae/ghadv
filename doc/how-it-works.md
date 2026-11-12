@@ -1,10 +1,10 @@
 # How it works
 
-`ghadv` combines authenticated provider APIs with local AI/editor workflows.
+`gsadv` combines authenticated provider APIs with local AI/editor workflows.
 GitHub requests use `gh api`; GitLab requests use `glab api`. API arguments are arrays,
 and each request receives the resolved host explicitly.
 
-`ghadv.v` parses arguments and dispatches commands. `repository.v` resolves provider,
+`gsadv.v` parses arguments and dispatches commands. `repository.v` resolves provider,
 host and project identity from options, source URLs and Git remotes. `provider.v`
 exposes shared repository operations and supported states/actions. `github.v` and
 `gitlab.v` own their respective endpoints, payloads and response handling.

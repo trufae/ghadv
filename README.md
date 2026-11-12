@@ -1,4 +1,4 @@
-# ghadv
+# gsadv — Git Security Advisories
 
 Manage GitHub security advisories and GitLab disclosure issues from the command line.
 Written in [V](https://vlang.io).
@@ -8,7 +8,7 @@ An AI agent does the reconstruction; you keep the last word.
 
 ```sh
 $ cd ~/radare2
-$ ghadv new 8f3a2c1 found by fuzzing the PDB parser
+$ gsadv new 8f3a2c1 found by fuzzing the PDB parser
 ```
 
 ## What it does
@@ -35,8 +35,9 @@ GitLab's CVE request process; it does not submit a request. GitLab has no equiva
 GitHub's advisory publishing endpoint, so `publish`, `draft` and structured `credits`
 remain GitHub-only. GitLab Ultimate vulnerability reports are not required or queried.
 Custom servers use `--provider gitlab -r https://code.example/group/project`.
-Use `--remote name` to choose another Git remote. The `ghadv` command and existing
-`GHADV_*` settings remain supported. See the [GitLab guide](doc/gitlab.md) for setup,
+Use `--remote name` to choose another Git remote. The tool was renamed from `ghadv`
+to `gsadv`; configuration now uses `GSADV_*`, with `GHADV_*` aliases still supported.
+See the [GitLab guide](doc/gitlab.md) for setup,
 state/visibility differences, CVE tracking and limitations.
 
 ## Install
@@ -46,15 +47,15 @@ Requires [V](https://vlang.io), `git`, and the authenticated CLI for your provid
 to the project issues for GitLab. GitLab Ultimate is not required.
 
 ```sh
-git clone <this repo> && cd ghadv
-make BIN=ghadv install   # builds and installs ghadv into ~/.local/bin
+git clone https://github.com/trufae/gsadv.git && cd gsadv
+make BIN=gsadv install   # builds and installs gsadv into ~/.local/bin
 ```
 
-Or build only: `make` (defaults to `ghadv`), or `v -o ghadv .`. `BIN`, `PREFIX` and
+Or build only: `make` (defaults to `gsadv`), or `v -o gsadv .`. `BIN`, `PREFIX` and
 `BINDIR` are overridable; `make uninstall` and `make clean` exist. Use the same `BIN`
 value for install, uninstall and clean.
 
-The [CI workflow](.github/workflows/ci.yml) builds and tests `ghadv` on macOS and
+The [CI workflow](.github/workflows/ci.yml) builds and tests `gsadv` on macOS and
 Alpine Linux (musl) for pushes and pull requests, and can also be run manually.
 Both jobs use the latest V source: macOS installs it with `vlang/setup-v`, while
 Alpine builds it inside an Alpine container. They run the unit tests, `--help`,
@@ -63,10 +64,10 @@ and the offline GitHub/GitLab smoke checks with stub provider CLIs.
 ## Usage
 
 ```sh
-ghadv [-r namespace/repo|url] [--provider github|gitlab] [--host hostname] [--remote name] [command] [args]
+gsadv [-r namespace/repo|url] [--provider github|gitlab] [--host hostname] [--remote name] [command] [args]
 ```
 
-Run `ghadv` with no arguments for the TUI (advisory/disclosure, commit and labeled issues/PRs/MRs tabs).
+Run `gsadv` with no arguments for the TUI (advisory/disclosure, commit and labeled issues/PRs/MRs tabs).
 The screen opens immediately while repository detection, remote lists and local Git
 details load in background threads. Each tab becomes usable as its data arrives;
 navigation and quitting stay responsive during loading and reloads. Reload failures
@@ -102,7 +103,7 @@ Key commands:
 | `invalid <id\|commit\|url> [reason]` | show a local invalid tag, or set it with a reason |
 | `unmark <id\|commit\|url>` | remove a local invalid tag |
 
-For example, `ghadv invalid GHSA-xxxx-yyyy-zzzz "No tagged release shipped vulnerable code"`
+For example, `gsadv invalid GHSA-xxxx-yyyy-zzzz "No tagged release shipped vulnerable code"`
 records a local triage decision. In the TUI, `i` marks the selected item or edits its reason,
 and `I` removes the tag. Lists show `[invalid]`; `/` searches both the tag and its reason.
 Tags survive restarts and apply only to the selected item, independently of linked items.
@@ -111,9 +112,9 @@ the finding in its description, then `close` to reject an unpublished advisory/r
 See [invalid tags](doc/usage.md#invalid--unmark).
 
 The `log` command and TUI commit tab include commits tagged `##crash`, `##security`,
-`##vulnerability` or `##sandbox` by default. Override the pattern with `GHADV_GREP`.
+`##vulnerability` or `##sandbox` by default. Override the pattern with `GSADV_GREP`.
 
-Configuration lives in `GHADV_REPO`, `GHADV_LABEL`, `GHADV_AI`, `GHADV_GREP`, plus `$EDITOR`
+Configuration lives in `GSADV_REPO`, `GSADV_LABEL`, `GSADV_AI`, `GSADV_GREP`, plus `$EDITOR`
 and `$PAGER`. See [doc/configuration.md](doc/configuration.md).
 
 AI workflows show live progress on stderr and an elapsed-time update every 10 seconds.
@@ -132,7 +133,7 @@ Replies stay separate in the recovery directory for review and editing. See
 | [doc/tui.md](doc/tui.md) | views and all keybindings |
 | [doc/advisory-format.md](doc/advisory-format.md) | the text format and the review diff rules |
 | [doc/ai-agent.md](doc/ai-agent.md) | how the agent is prompted and what it checks |
-| [doc/configuration.md](doc/configuration.md) | `GHADV_*`, `EDITOR`, `PAGER`, permissions |
+| [doc/configuration.md](doc/configuration.md) | `GSADV_*`, `EDITOR`, `PAGER`, permissions |
 | [doc/how-it-works.md](doc/how-it-works.md) | API endpoints and commit linking |
 | [doc/design-notes.md](doc/design-notes.md) | why it works this way, and limitations |
 

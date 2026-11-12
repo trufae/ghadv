@@ -1,11 +1,11 @@
 # TUI
 
-Running `ghadv` with no command opens the TUI. The header identifies the provider, host
+Running `gsadv` with no command opens the TUI. The header identifies the provider, host
 and project. GitLab uses a disclosures tab and an issues/MRs tab; see [GitLab support](gitlab.md).
 
 ```sh
 cd ~/radare2
-ghadv
+gsadv
 ```
 
 Views, switched forward with `tab` and backward with `shift-tab`:
@@ -13,15 +13,15 @@ Views, switched forward with `tab` and backward with `shift-tab`:
 | View | Shows |
 | --- | --- |
 | advisories | GHSA id, state, CVE id, severity, summary |
-| commits | tagged fix commits (`GHADV_GREP`), date, subject, and the advisory referencing them |
-| issues/PRs | items with `GHADV_LABEL` (default `cve`, or `ghadv tui <label>`), number, type, state, linked advisory and title |
+| commits | tagged fix commits (`GSADV_GREP`), date, subject, and the advisory referencing them |
+| issues/PRs | items with `GSADV_LABEL` (default `cve`, or `gsadv tui <label>`), number, type, state, linked advisory and title |
 
 The issues/PRs tab is always available and shows its label in the header. It includes every state, so
 closed issues and merged PRs remain available for reporting. `closed` in this list can
 mean either a merged or a closed, unmerged PR; `enter` shows its merge metadata.
 
 For GitLab, the disclosure tab lists `security-advisory` issues (configurable with
-`GHADV_ADVISORY_LABEL`). Rows show the native `opened`/`closed` state and a separate
+`GSADV_ADVISORY_LABEL`). Rows show the native `opened`/`closed` state and a separate
 `[confidential]`/`[public]` indicator. `f`/`F` cycle all/opened/closed, `d` reopens,
 `x` closes, and `c`/`a` opens CVE request instructions without submitting a request.
 Editing, closing and reopening preserve visibility. `p`/publish and draft transitions
@@ -80,7 +80,7 @@ Local invalid tags apply only to the selected item. Press `i`, enter a reason su
 cancels. An empty reason is rejected. Tagged rows show `[invalid]`, the status line shows
 the reason, and the actions menu wraps long reasons. Press `I` to remove the tag. The
 `/` filter also searches `invalid` and the reason. Tags survive restarts; `g` reloads tags
-changed by another ghadv process. They leave GitHub/GitLab state and linked items unchanged. On GitLab, a disclosure ID
+changed by another gsadv process. They leave GitHub/GitLab state and linked items unchanged. On GitLab, a disclosure ID
 and its issue URL identify the same tag, including when selected in different tabs.
 
 `b` also works on commits and issues/PRs without a linked advisory. It prompts for optional
@@ -89,7 +89,7 @@ and callers." Enter starts; Escape or Ctrl+C cancels. The selected source and an
 advisory are sent to the configured AI, which searches the current checkout for related
 mistakes. The findings report opens in the Markdown viewer; it does not update an advisory.
 The source, prompt and reply remain in the printed recovery directory. Use
-`ghadv resume <directory>` to reopen the report. See [the search prompt](ai-agent.md#finding-similar-bugs).
+`gsadv resume <directory>` to reopen the report. See [the search prompt](ai-agent.md#finding-similar-bugs).
 
 The `r` prompt accepts optional review instructions, for example: "Check the affected
 versions and whether the fix addresses the root cause." Press Enter to start, or Ctrl+C
@@ -97,7 +97,7 @@ or Escape to cancel without running the AI. The `n` input prompt accepts the sam
 keys. Ctrl+C while the AI is running or at a recovery prompt cancels that operation and
 returns to the list, keeping the recovery files printed before it started. An interrupted
 editor also returns to the list with terminal settings restored; unsaved editor buffers
-cannot be recovered by `ghadv`.
+cannot be recovered by `gsadv`.
 
 After a review or edit, enter `v` to view the current advisory, `r` to review it again
 with new context, `b` to find similar bugs, or `e` to edit it. The same prompt appears after
@@ -111,7 +111,7 @@ line above them shows the selection or the result of the last action. All lifecy
 CVE actions require confirmation; errors leave the advisory unchanged locally.
 
 Published advisories without a CVE offer `c request CVE`. On success, the list shows
-`requested*`, meaning ghadv recorded GitHub accepting the request. The record is saved
+`requested*`, meaning gsadv recorded GitHub accepting the request. The record is saved
 locally and restored after closing and reopening the app. Press `g` to refresh the
 assigned CVE; `s` displays server details and the locally recorded acceptance time.
 The TUI suppresses repeat requests while the record exists, including after a restart.
@@ -129,7 +129,7 @@ Jumping to a linked advisory outside the state filter switches its state filter 
 
 ## Credits screen
 
-Press `C` in the list or actions menu, or run `ghadv credits <ghsa>` directly. In the
+Press `C` in the list or actions menu, or run `gsadv credits <ghsa>` directly. In the
 commit and issue/PR views, this opens credits for the linked advisory. The screen lists
 each GitHub username and role, with an explanation of the selected role below the list.
 
@@ -212,5 +212,5 @@ and issue label shown when space permits. Narrow windows omit counts and filters
 falling back to the active tab; short windows prioritize the tab row over repository details.
 Pressing `A`
 cycles through `claude -p`, `codex exec -`, `pmai --progress "$(cat)"` and
-`opencode run "$(cat)"`; a custom `GHADV_AI` is
+`opencode run "$(cat)"`; a custom `GSADV_AI` is
 replaced by the first preset. The selected agent appears in the status line and `?` help.

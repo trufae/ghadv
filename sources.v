@@ -62,7 +62,7 @@ fn (api Repository) source(input string) !Source {
 
 // tagged fix commits in the cwd checkout: sha, date, subject
 fn commits() ![][]string {
-	grep := os.getenv_opt('GHADV_GREP') or { '##(crash|security|vulnerability|sandbox)' }
+	grep := setting('GREP') or { '##(crash|security|vulnerability|sandbox)' }
 	r := os.exec(['git', 'log', '-E', '--grep=${grep}', '-n', '2000', '--format=%H%x09%as%x09%s'])
 	if r.exit_code != 0 {
 		return error(r.output.trim_space())

@@ -26,11 +26,11 @@ Short version of the reasoning behind the tool.
 
 ## Limitations
 
-- Focused source-URL and advisory-link tests run with `v test ghadv_test.v`. Build with
-  `v -o ghadv .`. Run `v test .` for all focused tests and
-  `python3 test/gitlab_smoke.py /path/to/ghadv` for offline GitHub/GitLab integration
+- Focused source-URL and advisory-link tests run with `v test gsadv_test.v`. Build with
+  `v -o gsadv .`. Run `v test .` for all focused tests and
+  `python3 test/gitlab_smoke.py /path/to/gsadv` for offline GitHub/GitLab integration
   checks with stub CLIs, including POSIX TUI checks.
-- The commit view only sees commits matching `GHADV_GREP` in the local checkout.
+- The commit view only sees commits matching `GSADV_GREP` in the local checkout.
 - Advisory↔commit linking relies on 10–40 char hex ids appearing in the description.
 - Source linking requires full URLs in the disclosure description. GitHub PR evidence
   includes issue comments, not inline review threads; GitLab uses issue/MR notes.

@@ -1,10 +1,10 @@
 # AI agent
 
-The agent is any command that reads the prompt on stdin. Set it with `GHADV_AI`.
+The agent is any command that reads the prompt on stdin. Set it with `GSADV_AI`.
 
 | Value | Notes |
 | --- | --- |
-| `claude -p` | default; ghadv enables and decodes Claude's event stream |
+| `claude -p` | default; gsadv enables and decodes Claude's event stream |
 | `codex exec -` | native progress on stderr |
 | `pmai --progress "$(cat)"` | progress on stderr; reads the prompt from the argument instead of stdin |
 | `opencode run "$(cat)"` | OpenCode noninteractive mode; passes the prompt as one argument |
@@ -13,12 +13,12 @@ In the TUI, `A` cycles between these four presets.
 
 ## Progress and recovery
 
-Agent stderr is visible immediately in CLI and TUI workflows. ghadv also prints
+Agent stderr is visible immediately in CLI and TUI workflows. gsadv also prints
 an elapsed-time update every 10 seconds while the command is running, including
 when an agent is quiet. This update indicates the process is alive, not how much
 of the task it has completed. To capture feedback, redirect stderr with `2> progress.log`.
 
-For the exact `claude -p` preset (including `GHADV_AI='claude -p'`), ghadv adds
+For the exact `claude -p` preset (including `GSADV_AI='claude -p'`), gsadv adds
 `--output-format stream-json --verbose`. Assistant messages and tool activity appear
 on stderr, including Bash commands and descriptions, file paths, search patterns,
 URLs and subagent tasks. For example:
@@ -39,13 +39,13 @@ recovery text while Claude works. On success,
 the final result replaces that text, so JSON events, tool output and subagent
 messages never enter the advisory. A failed or incomplete stream stops the workflow
 before opening the editor or saving to the provider. Both files survive errors
-and interruptions; `claude.jsonl` can help repair `reply.txt` before `ghadv resume`.
+and interruptions; `claude.jsonl` can help repair `reply.txt` before `gsadv resume`.
 Successful advisory saves clean up both files; similar-bug reports retain them.
 
 The pmai preset requires a version supporting `--progress`. To select it directly:
 
 ```sh
-export GHADV_AI='pmai --progress "$(cat)"'
+export GSADV_AI='pmai --progress "$(cat)"'
 ```
 
 Other custom commands run exactly as configured, with stdout saved as plain text
@@ -101,7 +101,7 @@ advisory or review diff before saving.
 
 ## Finding similar bugs
 
-`b` in the TUI or `ghadv similar <id|commit|url> [context]` uses a dedicated search prompt.
+`b` in the TUI or `gsadv similar <id|commit|url> [context]` uses a dedicated search prompt.
 It includes the selected advisory (with CVE and references) or source patch/report, any
 linked advisory, the existing advisory list for duplicate checking, and optional context.
 The agent verifies the checkout and revision, reconstructs the original root cause and
@@ -115,5 +115,5 @@ is a valid result. The prompt instructs the agent to preserve tracked files and 
 state and keep local reproduction work in an isolated temporary directory.
 
 The report opens in the usual Markdown viewer. Source evidence, prompt and raw reply
-remain in the private recovery directory, including after success. `ghadv resume <directory>`
+remain in the private recovery directory, including after success. `gsadv resume <directory>`
 reopens the saved report without running the AI, parsing an advisory or submitting changes.

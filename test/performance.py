@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exercise background loading and measure commit navigation, using stub gh/git.
 
-Usage: python3 test/performance.py /path/to/ghadv [--benchmark-only]
+Usage: python3 test/performance.py /path/to/gsadv [--benchmark-only]
 """
 
 import json
@@ -115,7 +115,7 @@ def background(binary, root):
     for kind in ('repository', 'advisories', 'issues', 'git-status'):
         (root / ('hold-' + kind)).touch()
     start = time.monotonic()
-    with Terminal(binary, root, 'tui', size=(160, 30), repo=None, extra_env={'GHADV_REPO': ''}) as ui:
+    with Terminal(binary, root, 'tui', size=(160, 30), repo=None, extra_env={'GSADV_REPO': ''}) as ui:
         wait_for(ui, lambda: 'Loading...' in ui.buffer, timeout=1)
         print(f'First screen with blocked repository/GitHub/Git: {(time.monotonic()-start)*1000:.2f} ms')
         ui.send('\t')
@@ -191,7 +191,7 @@ def background(binary, root):
 
 def repository_failure(binary, root):
     (root / 'fail-repository').touch()
-    with Terminal(binary, root, 'tui', size=(160, 30), repo=None, extra_env={'GHADV_REPO': ''}) as ui:
+    with Terminal(binary, root, 'tui', size=(160, 30), repo=None, extra_env={'GSADV_REPO': ''}) as ui:
         ui.expect('Cannot find repository.')
         ui.send('\t')
         ui.expect('[commits 2000]')
@@ -206,12 +206,12 @@ def repository_failure(binary, root):
 
 if __name__ == '__main__':
     binary = str(Path(sys.argv[1]).resolve())
-    with tempfile.TemporaryDirectory(prefix='ghadv-performance-') as tmp:
+    with tempfile.TemporaryDirectory(prefix='gsadv-performance-') as tmp:
         root = Path(tmp)
         setup(root)
         navigation(binary, root)
     if '--benchmark-only' not in sys.argv:
-        with tempfile.TemporaryDirectory(prefix='ghadv-background-') as tmp:
+        with tempfile.TemporaryDirectory(prefix='gsadv-background-') as tmp:
             root = Path(tmp)
             setup(root)
             background(binary, root)

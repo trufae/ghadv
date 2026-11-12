@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline integration checks: python3 test/gitlab_smoke.py /path/to/ghadv."""
+"""Offline integration checks: python3 test/gitlab_smoke.py /path/to/gsadv."""
 import json
 import os
 from pathlib import Path
@@ -102,7 +102,7 @@ def stub():
 
 def main():
     binary = str(Path(sys.argv[1]).resolve())
-    with tempfile.TemporaryDirectory(prefix='ghadv-gitlab-smoke-') as directory:
+    with tempfile.TemporaryDirectory(prefix='gsadv-gitlab-smoke-') as directory:
         root = Path(directory)
         bindir = root / 'bin'
         bindir.mkdir()
@@ -110,10 +110,10 @@ def main():
             script = bindir / name
             script.write_text(f'#!{sys.executable}\n' + Path(__file__).read_text().split('\n', 1)[1])
             script.chmod(0o755)
-        env = {k: v for k, v in os.environ.items() if not k.startswith('GHADV_') and k not in ['GH_HOST', 'GITLAB_HOST']}
+        env = {k: v for k, v in os.environ.items() if not k.startswith(('GSADV_', 'GHADV_')) and k not in ['GH_HOST', 'GITLAB_HOST']}
         env.update(PATH=str(bindir) + os.pathsep + env['PATH'], FORGE_FIXTURE=str(root),
                    XDG_STATE_HOME=str(root / 'state'), TMPDIR=str(root), EDITOR='true',
-                   GHADV_AI=shlex.quote(str(bindir / 'agent')))
+                   GSADV_AI=shlex.quote(str(bindir / 'agent')))
         subprocess.run(['git', 'init', '-q', str(root)], check=True)
         subprocess.run(['git', '-C', str(root), 'remote', 'add', 'origin', 'git@gitlab.com:group/sub/repo.git'], check=True)
         (root / 'issues.json').write_text(json.dumps({'42': dict(iid=42, title='Original report',
@@ -131,6 +131,13 @@ def main():
 
         listing = run('ls')
         assert 'GL-42' in listing and '[confidential]' in listing and 'CVE-2026-12345' in listing
+        assert 'Usage: gsadv ' in run('--help')
+        legacy = {'GHADV_PROVIDER': 'github', 'GHADV_REPO': 'https://github.com/owner/repo'}
+        assert 'GitHub report' in run('ls', overrides=legacy)
+        current = dict(legacy, GSADV_PROVIDER='gitlab', GSADV_REPO='https://gitlab.com/group/sub/repo')
+        assert 'GL-42' in run('ls', overrides=current)
+        assert 'GL-42' in run('ls', overrides=dict(legacy, GSADV_PROVIDER='', GSADV_REPO=''))
+        assert 'GL-42' in run('--provider', 'gitlab', '-r', 'https://gitlab.com/group/sub/repo', 'ls', overrides=legacy)
         assert 'MR' in run('issues') and 'merged' in run('issues')
         assert 'visibility: confidential' in run('status', 'GL-42')
         count = len(calls())
@@ -165,7 +172,7 @@ def main():
         recovery = re.search(r'Recovery files: (.+)', output).group(1)
         assert json.loads((Path(recovery) / 'session.json').read_text())['provider'] == 'gitlab'
         try:
-            run('resume', recovery, overrides={'GHADV_PROVIDER': 'github', 'GHADV_REPO': 'wrong/repo', 'FAIL_AI': '1'})
+            run('resume', recovery, overrides={'GSADV_PROVIDER': 'github', 'GSADV_REPO': 'wrong/repo', 'FAIL_AI': '1'})
         finally:
             # V uses /tmp on macOS even when TMPDIR is set. Remove only this run's session.
             if Path(recovery).exists():
@@ -177,7 +184,7 @@ def main():
         assert 'GitHub report' in run('-r', 'https://github.com/owner/repo', 'ls')
         run('-r', 'https://github.com/owner/repo', 'cve', 'GHSA-abcd-efgh-ijkl')
         assert 'requested*' in run('-r', 'https://github.com/owner/repo', 'ls')
-        run('ls', overrides={'GHADV_REPO': 'owner/repo', 'GH_HOST': 'code.example'})
+        run('ls', overrides={'GSADV_REPO': 'owner/repo', 'GH_HOST': 'code.example'})
         assert calls()[-1]['client'] == 'gh' and calls()[-1]['host'] == 'code.example'
         assert 'https://code[.]example/' in calls()[-1]['args'][-1]
         if os.name == 'posix':

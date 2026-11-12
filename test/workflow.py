@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Workflow smoke checks with fake gh, AI and editor commands; no network access.
 
-Usage: python3 test/workflow.py /path/to/ghadv
+Usage: python3 test/workflow.py /path/to/gsadv
 """
 
 import json
@@ -129,7 +129,7 @@ def run(binary, root, mode='', answer='', args=None, **extra):
     env = os.environ | {
         'PATH': str(root) + os.pathsep + os.environ['PATH'],
         'TEST_ROOT': str(root), 'TMPDIR': str(root),
-        'GHADV_AI': 'ai', 'EDITOR': 'editor', 'EDITOR_MODE': mode,
+        'GSADV_AI': 'ai', 'EDITOR': 'editor', 'EDITOR_MODE': mode,
     } | extra
     result = subprocess.run(
         [binary, *(args or ['-r', 'owner/repo', 'review', 'GHSA-test'])],
@@ -152,7 +152,7 @@ def payload(root):
 
 
 def tui_checks(binary, root):
-    env = {'GHADV_AI': 'ai', 'EDITOR': 'editor', 'EDITOR_MODE': ''}
+    env = {'GSADV_AI': 'ai', 'EDITOR': 'editor', 'EDITOR_MODE': ''}
     (root / 'saved.json').unlink(missing_ok=True)
     # Accepting the unchanged review diff must PATCH the AI version, report success,
     # and reload the updated advisory before displaying the list again.
@@ -201,7 +201,7 @@ def tui_checks(binary, root):
     writes = [line for line in (root / 'gh.calls').read_text().splitlines()
               if '--input' in json.loads(line)]
     ai_calls = (root / 'ai.calls').read_text()
-    sessions = set(root.glob('ghadv-*'))
+    sessions = set(root.glob('gsadv-*'))
     with Terminal(binary, root, 'tui', env) as ui:
         ui.expect('GHSA-test')
         ui.expect('C credits')
@@ -219,7 +219,7 @@ def tui_checks(binary, root):
         ui.send('\x03')
         ui.finish()
     assert (root / 'ai.calls').read_text() == ai_calls
-    assert set(root.glob('ghadv-*')) == sessions
+    assert set(root.glob('gsadv-*')) == sessions
 
     # A failed AI reply must be visible before returning, with no editor or PATCH.
     (root / 'reply').write_text('Execution error')
@@ -525,7 +525,7 @@ https://github.com/owner/repo/commit/abcdef1234'''
 
 if __name__ == '__main__':
     binary = str(Path(sys.argv[1]).resolve())
-    with tempfile.TemporaryDirectory(prefix='ghadv-workflow-test-') as tmp:
+    with tempfile.TemporaryDirectory(prefix='gsadv-workflow-test-') as tmp:
         checks(binary, Path(tmp))
         tui_checks(binary, Path(tmp))
     print('Workflow recovery checks passed')

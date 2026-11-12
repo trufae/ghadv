@@ -106,9 +106,9 @@ fn (api Repository) github_request_cve(id string) !string {
 	}
 	api.github_request('--method', 'POST', 'repos/${api.repo}/security-advisories/${id}/cve')!
 	api.save_cve_request(id) or {
-		return 'CVE request accepted, but could not save the local request receipt: ${err}. Check with ghadv status ${id}'
+		return 'CVE request accepted, but could not save the local request receipt: ${err}. Check with gsadv status ${id}'
 	}
-	return 'CVE request accepted; assignment is asynchronous. Check with ghadv status ${id}'
+	return 'CVE request accepted; assignment is asynchronous. Check with gsadv status ${id}'
 }
 
 // The issues endpoint includes pull requests. Closed items may still need a CVE.
@@ -137,7 +137,7 @@ fn (api Repository) github_update_credits(id string, credits []Credit) ! {
 }
 
 fn (api Repository) github_send(method string, path string, payload string) !string {
-	f := os.join_path(os.temp_dir(), 'ghadv-${os.getpid()}.json')
+	f := os.join_path(os.temp_dir(), 'gsadv-${os.getpid()}.json')
 	os.write_file(f, payload)!
 	defer {
 		os.rm(f) or {}

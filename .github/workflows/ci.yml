@@ -21,10 +21,10 @@ jobs:
       - name: Build and test
         run: |
           v version
-          v -o ghadv .
-          ./ghadv --help
+          v -o gsadv .
+          ./gsadv --help
           v test .
-          python3 test/gitlab_smoke.py ./ghadv
+          python3 test/gitlab_smoke.py ./gsadv
 
   alpine:
     name: Alpine Linux
@@ -44,8 +44,8 @@ jobs:
               export VFLAGS="-cc gcc"
               make -C /opt/v
               v version
-              v -o ghadv .
-              ./ghadv --help
+              v -o gsadv .
+              ./gsadv --help
               v test .
-              python3 test/gitlab_smoke.py ./ghadv
+              python3 test/gitlab_smoke.py ./gsadv
             '

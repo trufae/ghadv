@@ -5,6 +5,7 @@ import json2
 import net.urllib
 import regex
 
+// Keep the serialized marker compatible with existing disclosure issues.
 const gitlab_advisory_marker = '<!-- ghadv:advisory -->\n```text\n'
 
 struct GitLabUser {
@@ -63,7 +64,7 @@ struct GitLabCreate {
 }
 
 fn gitlab_advisory_label() string {
-	label := os.getenv('GHADV_ADVISORY_LABEL')
+	label := setting('ADVISORY_LABEL') or { '' }
 	return if label != '' { label } else { 'security-advisory' }
 }
 
@@ -78,7 +79,7 @@ fn (api Repository) gitlab_request(args ...string) !string {
 }
 
 fn (api Repository) gitlab_send(method string, path string, payload string) !string {
-	file := os.join_path(os.temp_dir(), 'ghadv-gitlab-${os.getpid()}.json')
+	file := os.join_path(os.temp_dir(), 'gsadv-gitlab-${os.getpid()}.json')
 	os.write_file(file, payload)!
 	defer { os.rm(file) or {} }
 	return api.gitlab_request('--method', method, path, '--input', file)
@@ -129,7 +130,7 @@ fn gitlab_issue_advisory(issue GitLabIssue) !Adv {
 		return Adv{summary: issue.title, description: issue.description}
 	}
 	text := issue.description[gitlab_advisory_marker.len..]
-	end := text.index('\n```\n\n') or { return error('damaged ghadv metadata in GL-${issue.iid}; repair the issue description') }
+	end := text.index('\n```\n\n') or { return error('damaged gsadv metadata in GL-${issue.iid}; repair the issue description') }
 	mut a := parse(text[..end] + '\n---\n' + text[end + 6..])!
 	a.summary = issue.title
 	return a
@@ -220,7 +221,7 @@ fn (api Repository) gitlab_diff(path string) !string {
 		text += 'diff --git a/${diff.old_path} b/${diff.new_path}\n--- a/${diff.old_path}\n+++ b/${diff.new_path}\n${diff.diff}\n'
 		if diff.too_large || diff.collapsed || diff.diff == '' { text += '[GitLab omitted this diff; inspect the commit locally.]\n' }
 	}
-	if text.len > 200000 { return text[..200000] + '\n[Diff truncated by ghadv; inspect the commit locally.]\n' }
+	if text.len > 200000 { return text[..200000] + '\n[Diff truncated by gsadv; inspect the commit locally.]\n' }
 	return text
 }
 

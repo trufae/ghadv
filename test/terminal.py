@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check bounded TUI output, resizes, scrolling and redraws using a PTY and stub gh/git.
 
-Usage: python3 test/terminal.py /path/to/ghadv
+Usage: python3 test/terminal.py /path/to/gsadv
 """
 
 import fcntl
@@ -42,7 +42,7 @@ CSI = re.compile(r'\x1b\[([0-?]*)([ -/]*)([@-~])')
 
 
 class Screen:
-    """Track the subset of terminal output used by ghadv and reject implicit scrolling."""
+    """Track the subset of terminal output used by gsadv and reject implicit scrolling."""
     def __init__(self, size):
         self.resize(size)
         self.alt = False
@@ -201,6 +201,6 @@ def checks(binary, root):
 
 
 if __name__ == '__main__':
-    with tempfile.TemporaryDirectory(prefix='ghadv-terminal-test-') as tmp:
+    with tempfile.TemporaryDirectory(prefix='gsadv-terminal-test-') as tmp:
         checks(str(Path(sys.argv[1]).resolve()), Path(tmp))
     print('Terminal size, resize, scrolling and redraw checks passed')

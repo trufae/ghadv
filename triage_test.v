@@ -4,7 +4,7 @@ import os
 import term
 
 fn test_invalid_marks_persist_and_are_scoped_to_host_repository_and_item() ! {
-	dir := os.join_path(os.temp_dir(), 'ghadv-invalid-test-${os.getpid()}')
+	dir := os.join_path(os.temp_dir(), 'gsadv-invalid-test-${os.getpid()}')
 	old_state := os.getenv_opt('XDG_STATE_HOME')
 	old_host := os.getenv_opt('GH_HOST')
 	os.setenv('XDG_STATE_HOME', dir, true)

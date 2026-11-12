@@ -21,6 +21,7 @@ fn (api Repository) state_path(kind string, id string) string {
 	// Preserve the existing GitHub filenames while isolating GitLab records.
 	identity := '${api.host}\n${api.repo}\n${id}'.to_lower()
 	receipt := sha256.hexhash(if api.provider == 'gitlab' { 'gitlab\n${identity}' } else { identity })
+	// Retain the pre-rebrand state directory so existing records stay visible.
 	return os.join_path(base, 'ghadv', kind, receipt)
 }
 
@@ -104,9 +105,9 @@ fn resolve_repository(input string, provider string, host string, remote string)
 }
 
 fn configured_repository(input string) !Repository {
-	repo := os.getenv('GHADV_REPO')
-	mut provider := os.getenv('GHADV_PROVIDER')
-	mut host := os.getenv('GHADV_HOST')
+	repo := setting('REPO') or { '' }
+	mut provider := setting('PROVIDER') or { '' }
+	mut host := setting('HOST') or { '' }
 	if host == '' && !repo.contains('://') && !repo.contains('@') && !input.contains('://') {
 		host = os.getenv(if provider == 'gitlab' { 'GITLAB_HOST' } else { 'GH_HOST' })
 		if provider == '' && host != '' { provider = 'github' }
@@ -119,5 +120,5 @@ fn configured_repository(input string) !Repository {
 		}
 		return Repository{repo: s.repo, host: s.host, provider: s.provider}
 	}
-	return resolve_repository(repo, provider, host, os.getenv('GHADV_REMOTE'))
+	return resolve_repository(repo, provider, host, setting('REMOTE') or { '' })
 }

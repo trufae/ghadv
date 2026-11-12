@@ -1,7 +1,7 @@
 PREFIX ?= $(HOME)/.local
 BINDIR ?= $(PREFIX)/bin
 SRC = $(filter-out %_test.v,$(wildcard *.v))
-BIN = ghadv
+BIN = gsadv
 
 all: $(BIN)
 

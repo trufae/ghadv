@@ -42,7 +42,7 @@ fn test_gitlab_sources_support_subgroups_and_preserve_identity() ! {
 }
 
 fn test_repository_detection_selects_remote_without_network_requests() ! {
-	dir := os.join_path(os.temp_dir(), 'ghadv-remotes-${os.getpid()}')
+	dir := os.join_path(os.temp_dir(), 'gsadv-remotes-${os.getpid()}')
 	os.mkdir_all(dir)!
 	old := os.getwd()
 	os.chdir(dir)!

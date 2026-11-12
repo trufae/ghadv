@@ -3,7 +3,7 @@
 This is a small V CLI/TUI for managing GitHub repository security advisories and
 GitLab disclosures stored as confidential labeled issues.
 
-- `ghadv.v` contains argument parsing, help and command dispatch.
+- `gsadv.v` contains argument parsing, help and command dispatch.
 - `repository.v` owns provider/host/project identity and remote detection;
   `provider.v` dispatches repository operations and exposes supported actions.
 - `github.v` owns GitHub endpoints and all `gh` requests; `gitlab.v` owns
@@ -14,8 +14,8 @@ GitLab disclosures stored as confidential labeled issues.
 - `sources.v` parses commit/issue/PR inputs and discovers local fix commits.
 - `README.md` documents usage and includes design notes. Check the source for
   current behavior; design notes may describe ideas that are not implemented.
-- The CLI name and default Makefile binary are `ghadv`; `BIN` is overridable.
-  Configuration uses `GHADV_*` environment variables. Keep those
+- The CLI name and default Makefile binary are `gsadv`; `BIN` is overridable.
+  Configuration uses `GSADV_*` environment variables with legacy `GHADV_*` aliases. Keep those
   interfaces stable unless a change is requested.
 
 ## Development
@@ -24,7 +24,7 @@ GitLab disclosures stored as confidential labeled issues.
   APIs and the existing helpers over new dependencies or abstractions.
 - Use `gh` for GitHub and `glab` for GitLab authentication and API requests. Pass arguments as arrays;
   reserve shell execution for intentionally configurable commands such as
-  `$EDITOR` and `GHADV_AI`.
+  `$EDITOR` and `GSADV_AI`.
 - Keep endpoints and payload handling in the provider's file; CLI, TUI and workflow
   code should call the repository-scoped methods. Keep GitLab issue state and visibility
   separate; editing, closing or reopening must not change confidentiality.
@@ -33,19 +33,19 @@ GitLab disclosures stored as confidential labeled issues.
 
 ## Validation
 
-Build the shared module with `v -o ghadv .`. For a local smoke check without replacing the
+Build the shared module with `v -o gsadv .`. For a local smoke check without replacing the
 existing executable, build into a temporary directory and run help:
 
 ```sh
 build_dir=$(mktemp -d)
-v -o "$build_dir/ghadv" .
-"$build_dir/ghadv" --help
+v -o "$build_dir/gsadv" .
+"$build_dir/gsadv" --help
 ```
 
-Run the focused source parsing and linking tests with `v test ghadv_test.v`.
+Run the focused source parsing and linking tests with `v test gsadv_test.v`.
 For behavior changes, use focused checks or tests covering the affected logic.
 Use a stub `gh` executable on `PATH`
 when testing API interactions; routine validation should not mutate real advisories.
 `v test .` also covers provider identity, GitLab formatting, recovery and TUI behavior.
-Run `python3 test/gitlab_smoke.py /path/to/temporary/ghadv` for offline end-to-end checks
+Run `python3 test/gitlab_smoke.py /path/to/temporary/gsadv` for offline end-to-end checks
 with stub `gh` and `glab` executables, including a POSIX pseudo-terminal smoke test.
